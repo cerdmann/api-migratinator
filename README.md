@@ -1,0 +1,93 @@
+# api-migratinator
+
+A scripted migration tool for moving large customer API Builder assets to V12 Spec Hub, using the git repo as the source of truth.
+
+---
+
+## Setting Up for Dev
+
+To test the migration tool end-to-end you need a Postman workspace populated with git-linked API Builder APIs. Follow the steps below to create a realistic test environment.
+
+### Prerequisites
+
+- A Postman account with API Builder access (Enterprise plan or Professional Services sandbox)
+- Admin-level Postman API key — generate one at **Postman → Settings → API Keys**
+- One or more test git repos on GitHub, GitLab, or Bitbucket (one repo per API is the typical customer pattern, but a monorepo with subdirectories also works)
+- The repos must be accessible to your Postman account via a connected git integration
+
+### 1. Connect your git provider to Postman
+
+If you haven't already:
+
+1. In Postman, go to **Settings → Integrations**
+2. Add a GitHub (or GitLab / Bitbucket) integration and authorize Postman to access your repos
+3. Confirm the integration shows as active before proceeding
+
+### 2. Seed your test repos
+
+Each test repo needs at minimum:
+
+```
+/
+├── openapi.yaml          # or openapi.json — an OpenAPI 2/3 or AsyncAPI spec
+└── postman/
+    └── collections/
+        └── my-api.json   # a v2.1 collection (the migration will convert this to v3)
+```
+
+You can use any valid OpenAPI spec. A minimal example is in [`docs/sample-spec.yaml`](docs/sample-spec.yaml). Create as many repos (or subdirectories) as you want to simulate `n` APIs.
+
+### 3. Create git-linked APIs in API Builder
+
+Repeat the following for each test API you want to migrate:
+
+1. In Postman, open the target workspace and go to **APIs** in the left sidebar
+2. Click **+** to create a new API — give it a meaningful name (e.g. `test-api-01`)
+3. On the API overview page, click the **Repository** tab
+4. Click **Connect Repository** and select your git provider
+5. Choose the **organization**, **repository**, and **branch** (e.g. `main`)
+6. Set the **Schema directory** to the folder containing your spec file (e.g. `/` or `/specs`)
+7. Set the **Collection directory** to `postman/collections`
+8. Click **Connect** — Postman will pull the schema from the repo
+9. Publish at least one version: go to the **Overview** tab → **Publish** → name it `v1.0.0`
+
+Repeat until you have enough APIs to exercise the tool at the scale you want to test.
+
+### 4. Configure the tool
+
+The tool auto-discovers all workspaces and APIs scoped to the provided API key — no workspace IDs required. Copy the example env file and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+```
+POSTMAN_API_KEY=your-admin-api-key
+TARGET_WORKSPACE_NAME=Migration Output
+GIT_TOKEN=your-github-or-gitlab-pat
+```
+
+### 5. Verify your setup
+
+Once the tool is built, you can do a dry-run discovery to confirm it can see all your workspaces and APIs before triggering any migration:
+
+```bash
+# coming soon
+pnpm run discover
+```
+
+This will page through all workspaces in your team, list every API Builder API found, indicate whether each is git-linked, and print the resolved repo metadata — without making any changes.
+
+---
+
+## Architecture
+
+See [`docs/design.md`](docs/design.md) for the full migration design.
+
+## Development
+
+```bash
+pnpm install
+pnpm run build
+pnpm run test
+```

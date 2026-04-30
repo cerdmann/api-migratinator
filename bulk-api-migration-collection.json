@@ -1,0 +1,709 @@
+{
+  "info": {
+    "_postman_id": "0adfe6e5-3819-4c1f-a8f0-2cdcc85b0319",
+    "name": "API->Workspace Generator",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "53947274",
+    "_collection_link": "https://go.postman.co/collection/53947274-0adfe6e5-3819-4c1f-a8f0-2cdcc85b0319?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Data validation",
+      "item": [
+        {
+          "name": "Data validation - Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.getpostman.com/users/{{userToValidate}}",
+              "protocol": "https",
+              "host": [
+                "api",
+                "getpostman",
+                "com"
+              ],
+              "path": [
+                "users",
+                "{{userToValidate}}"
+              ]
+            },
+            "description": "Retrieves one user record for `userToValidate` to confirm that a mapped user exists and matches the expected owner data. Use it to validate user lookups independently from the collection runner flow."
+          },
+          "response": []
+        },
+        {
+          "name": "Data validation - APIs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.getpostman.com/workspaces?elementType=api&elementId={{elementId}}",
+              "protocol": "https",
+              "host": [
+                "api",
+                "getpostman",
+                "com"
+              ],
+              "path": [
+                "workspaces"
+              ],
+              "query": [
+                {
+                  "key": "elementType",
+                  "value": "api"
+                },
+                {
+                  "key": "elementId",
+                  "value": "{{elementId}}"
+                }
+              ]
+            },
+            "description": "Retrieves one API record for this request:\n\n[<code>https://api.getpostman.com/api/{{apiToValidate}}</code>](https://api.getpostman.com/workspaces)\n\nPopulate `apiToValidate` to verify that a mapped API exists and that its details match the collected dataset. Use it for spot checks when validating output quality.\n\nOr\n\nRetrieve the related workspace information tied to an element:\n\n[<code>https://api.getpostman.com/workspaces?elementType=api&amp;elementId={{elementId}}</code>](https://api.getpostman.com/workspaces?elementType=api&elementId=%7B%7BelementId%7D%7D)\n\n`elementId` will be the ID of your API ior Collection. Use it for spot checks when validating output quality."
+          },
+          "response": []
+        },
+        {
+          "name": "Data validation - API versions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://api.getpostman.com/apis/065d8b57-036d-4aaa-b5ef-1ff37a9555b2/versions",
+              "protocol": "https",
+              "host": [
+                "api",
+                "getpostman",
+                "com"
+              ],
+              "path": [
+                "apis",
+                "065d8b57-036d-4aaa-b5ef-1ff37a9555b2",
+                "versions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Echo values",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "console.log(pm.collectionVariables.get('apiInfo'))"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://postman-echo.com/get",
+              "protocol": "https",
+              "host": [
+                "postman-echo",
+                "com"
+              ],
+              "path": [
+                "get"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Use these requests to spot-check records produced by the mapping workflow.\n\nEach request validates a single API or user by ID so you can confirm the collected data if needed."
+    },
+    {
+      "name": "Get API Builder objects",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// initialize variables  ",
+              "",
+              "pm.collectionVariables.set('apiInfo', JSON.parse('[]'))",
+              "pm.collectionVariables.set('workspacesToTag', JSON.parse('[]'))",
+              "pm.collectionVariables.set('apiCounter', parseInt(0))",
+              "pm.collectionVariables.set('workspaceCounter', parseInt(0))",
+              "pm.collectionVariables.set('rateLimitController', parseInt(0))",
+              "pm.collectionVariables.set('totalCounter', parseInt(0))",
+              "pm.collectionVariables.set('rolesCounter', parseInt(0))",
+              "pm.collectionVariables.set('workspacesInfo', JSON.parse('[]'))",
+              ""
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "let apiInfo = pm.collectionVariables.get(\"apiInfo\");",
+              "let apis = pm.response.json().apis;",
+              "",
+              "// build object for downstream output, per each API ",
+              "apis.forEach(val => {",
+              "    apiInfo.push({",
+              "        apiId: val.id,",
+              "        name: val.name,",
+              "    })",
+              "})",
+              "",
+              "pm.collectionVariables.set('apiInfo', apiInfo)",
+              "",
+              "// console.log(pm.collectionVariables.get('apiInfo'))"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://api.getpostman.com/apis",
+          "protocol": "https",
+          "host": [
+            "api",
+            "getpostman",
+            "com"
+          ],
+          "path": [
+            "apis"
+          ]
+        },
+        "description": "Retrieves the list of API Builder APIs used as the source dataset for the mapping workflow. Run this first to populate API metadata and identify the records that need user lookups or validation."
+      },
+      "response": []
+    },
+    {
+      "name": "Get and add workspace info",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "let apiInfo = pm.collectionVariables.get(\"apiInfo\");",
+              "let apiCounter = pm.collectionVariables.get(\"apiCounter\");",
+              "// let rateLimitController = pm.collectionVariables.get(\"rateLimitController\"); // // ONLY NEEDED IF USING DYNAMIC RATE LIMIT LOGIC",
+              "",
+              "// DELAY EACH REQUEST BY 1 SECOND TO AVOID RATE LIMITING OF 10 REQUESTS / 10 SECONDS TO /WORKSPACES ENDPOINT",
+              "const delayRequest = () => {",
+              "    console.log(\"Pausing 1 second\");",
+              "    setTimeout(() => {}, 1000);",
+              "}",
+              "delayRequest();",
+              "",
+              "// USE THIS IF YOU WANT TO LIMIT BY SETS OF 10 API REQUESTS EVERY 10 SECONDS",
+              "// if (rateLimitController < 10) {",
+              "//     console.log(`Count: ${rateLimitController}`)",
+              "// } else {",
+              "//     setTimeout(() => {",
+              "//         console.log(\"Pausing 8 seconds\");",
+              "//     }, 8000);",
+              "//     rateLimitController = 0;",
+              "//     pm.collectionVariables.set('rateLimitController', rateLimitController)",
+              "// }",
+              "",
+              "",
+              "let targetApiId = apiInfo[apiCounter].apiId",
+              "pm.collectionVariables.set('targetApiId', targetApiId)",
+              ""
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "let apiInfo = pm.collectionVariables.get(\"apiInfo\")",
+              "let apiCounter = pm.collectionVariables.get(\"apiCounter\")",
+              "let totalCounter = pm.collectionVariables.get('totalCounter')",
+              "let workspacesToTag = pm.collectionVariables.get('workspacesToTag')",
+              "let workspacesInfo = pm.collectionVariables.get('workspacesInfo')",
+              "// ONLY NEEDED IF USING DYNAMIC RATE LIMIT LOGIC",
+              "// let rateLimitController = pm.collectionVariables.get(\"rateLimitController\");",
+              "// rateLimitController += 1;",
+              "// pm.collectionVariables.set(\"rateLimitController\", rateLimitController);",
+              "",
+              "let res = pm.response.json().workspaces;",
+              "",
+              "if (apiCounter < apiInfo.length - 1) {",
+              "    apiInfo[apiCounter].workspaceId = res[0].id ? res[0].id : `Couldn't find workspaceId for ${res[0].id}`",
+              "    apiCounter += 1",
+              "    workspacesToTag.push(res[0].id)",
+              "    pm.collectionVariables.set(\"apiCounter\", apiCounter)",
+              "    pm.collectionVariables.set(\"apiInfo\", apiInfo)",
+              "    pm.collectionVariables.set(\"workspacesToTag\", workspacesToTag)",
+              "    pm.collectionVariables.set(\"workspacesInfo\", workspacesInfo)",
+              "    pm.execution.setNextRequest('Get and add workspace info')",
+              "} else if (apiCounter >= apiInfo.length - 1){",
+              "    apiInfo[apiCounter].workspaceId = res[0].id ? res[0].id : `Couldn't find workspaceId for ${res[0].id}`",
+              "    workspacesToTag.push(res[0].id)",
+              "    // remove duplicates from workspacesToTag array",
+              "    let workspacesToTag_set = new Set(workspacesToTag)",
+              "    // set back to array",
+              "    workspacesToTag = Array.from(workspacesToTag_set)",
+              "    pm.collectionVariables.set(\"workspacesToTag\", workspacesToTag)",
+              "    pm.collectionVariables.set(\"apiInfo\", apiInfo);",
+              "    console.log(\"All workspaces fetched, exiting...\")",
+              "    pm.execution.setNextRequest('Tag original workspaces')",
+              "}",
+              "else {",
+              "    console.log(\"You have reached the catch-all condition for APIs & Workspaces, exiting...\")",
+              "    pm.execution.setNextRequest(null)",
+              "}",
+              "",
+              "// long running count of requests made",
+              "totalCounter += 1",
+              "console.log(`API processing count: ${totalCounter} / ${apiInfo.length}`)",
+              "pm.collectionVariables.set('totalCounter', parseInt(totalCounter))"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://api.getpostman.com/workspaces?elementType=api&elementId={{targetApiId}}",
+          "protocol": "https",
+          "host": [
+            "api",
+            "getpostman",
+            "com"
+          ],
+          "path": [
+            "workspaces"
+          ],
+          "query": [
+            {
+              "key": "elementType",
+              "value": "api"
+            },
+            {
+              "key": "elementId",
+              "value": "{{targetApiId}}"
+            }
+          ]
+        },
+        "description": "### Estimated time per sets of API calls\n\nEach time you send this request, a 1 second delay occurs. This is built in to prevent rate limiting during Collection or Folder runs.\n\nThis accounts for the default rate limit on the `/workspaces` endpoint.\n\nIf your team has a high number of APIs in API Builder, you may want to start your run of the **Collection runner requests** folder while you need to do other tasks.\n\n- 10,000 API elements / \\~167 minutes\n    \n- 5,000 API elements / \\~84 minutes\n    \n- 1000 API elements / \\~17 minutes"
+      },
+      "response": []
+    },
+    {
+      "name": "Tag original workspaces",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "let workspaceCounter = pm.collectionVariables.get('workspaceCounter');",
+              "let workspacesToTag = pm.collectionVariables.get('workspacesToTag');",
+              "let apiInfo = pm.collectionVariables.get('apiInfo');",
+              "// add logic to log errors if too many tags, bad formatting, etc.",
+              "",
+              "let res = pm.response.json();",
+              "",
+              "if (workspaceCounter < workspacesToTag.length - 1){",
+              "    pm.collectionVariables.set('workspaceCounter', workspaceCounter + 1);",
+              "    pm.execution.setNextRequest('Tag original workspaces');",
+              "} else if (workspaceCounter >= workspacesToTag.length - 1) {",
+              "    pm.collectionVariables.set('workspaceCounter', parseInt(0));",
+              "    pm.collectionVariables.set('apiCounter', parseInt(0));",
+              "    pm.execution.setNextRequest('Get workspace roles');",
+              "    console.log(pm.collectionVariables.get('apiInfo'))",
+              "} else {",
+              "    console.log(`Something unexpected happened, breaking out of run...\\n response: ${JSON.stringify(res)}`)",
+              "    pm.execution.setNextRequest(null);",
+              "}"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        },
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "let workspacesToTag = pm.collectionVariables.get('workspacesToTag');",
+              "let workspaceCounter = pm.collectionVariables.get('workspaceCounter');",
+              "",
+              "let targetWorkspaceId_toTag = workspacesToTag[workspaceCounter]",
+              "pm.collectionVariables.set('targetWorkspaceId_toTag', targetWorkspaceId_toTag)"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"tags\": [\n        {\n            \"slug\": \"pre-api-migration-workspace\"\n        }\n    ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://api.getpostman.com/workspaces/{{targetWorkspaceId_toTag}}/tags",
+          "protocol": "https",
+          "host": [
+            "api",
+            "getpostman",
+            "com"
+          ],
+          "path": [
+            "workspaces",
+            "{{targetWorkspaceId_toTag}}",
+            "tags"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get workspace roles",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "let apiInfo = pm.collectionVariables.get(\"apiInfo\");",
+              "let rolesCounter = pm.collectionVariables.get(\"rolesCounter\");",
+              "let workspacesToTag = pm.collectionVariables.get('workspacesToTag')",
+              "// let rateLimitController = pm.collectionVariables.get(\"rateLimitController\");",
+              "",
+              "// DELAY EACH REQUEST BY 1 SECOND TO AVOID RATE LIMITING OF 10 REQUESTS / 10 SECONDS TO /WORKSPACES ENDPOINT",
+              "const delayRequest = () => {",
+              "    console.log(\"Pausing 1 second\");",
+              "    setTimeout(() => {}, 1000);",
+              "}",
+              "delayRequest();",
+              "",
+              "// USE THIS IF YOU WANT TO LIMIT BY SETS OF 10 API REQUESTS EVERY 10 SECONDS",
+              "// if (rateLimitController < 10) {",
+              "//     console.log(`Count: ${rateLimitController}`)",
+              "// } else {",
+              "//     setTimeout(() => {",
+              "//         console.log(\"Pausing 8 seconds\");",
+              "//     }, 8000);",
+              "//     rateLimitController = 0;",
+              "//     pm.collectionVariables.set('rateLimitController', rateLimitController)",
+              "// }",
+              "",
+              "let targetWorkspaceId_updateRoles = apiInfo[rolesCounter].workspaceId",
+              "",
+              "pm.collectionVariables.set('targetWorkspaceId_updateRoles', targetWorkspaceId_updateRoles)",
+              ""
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "let apiInfo = pm.collectionVariables.get(\"apiInfo\");",
+              "let rolesCounter = pm.collectionVariables.get(\"rolesCounter\")",
+              "let totalCounter = pm.collectionVariables.get('totalCounter')",
+              "// ONLY NEEDED IF USING DYNAMIC RATE LIMIT LOGIC",
+              "// let rateLimitController = pm.collectionVariables.get(\"rateLimitController\");",
+              "// rateLimitController += 1;",
+              "// pm.collectionVariables.set(\"rateLimitController\", rateLimitController);",
+              "",
+              "let res = pm.response.json().roles;",
+              "",
+              "if (rolesCounter < apiInfo.length - 1) {",
+              "    apiInfo[rolesCounter].roles = res ? res : `Couldn't find roles for ${apiInfo[rolesCounter]}`",
+              "    pm.collectionVariables.set(\"rolesCounter\", rolesCounter += 1);",
+              "    pm.collectionVariables.set(\"apiInfo\", apiInfo);",
+              "    pm.execution.setNextRequest('Get workspace roles')",
+              "} else if (rolesCounter >= apiInfo.length - 1){",
+              "    apiInfo[rolesCounter].roles = res ? res : `Couldn't find roles for ${apiInfo[rolesCounter]}`",
+              "    pm.collectionVariables.set(\"rolesCounter\", rolesCounter += 1);",
+              "    pm.collectionVariables.set(\"apiInfo\", apiInfo);",
+              "    console.log(pm.collectionVariables.get(\"apiInfo\"))",
+              "    console.log(\"All workspaces fetched, exiting...\")",
+              "    pm.execution.setNextRequest(\"Get and store API info\")",
+              "}",
+              "else {",
+              "    console.log(\"You have reached the catch-all condition for APIs & Workspaces, exiting...\")",
+              "    pm.execution.setNextRequest('Collect user information')",
+              "}",
+              "",
+              "// long running count of requests made",
+              "totalCounter += 1",
+              "console.log(`Workspace roles processing count: ${pm.collectionVariables.get(\"rolesCounter\")} / ${apiInfo.length}`)",
+              "pm.collectionVariables.set('totalCounter', parseInt(totalCounter))"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://api.getpostman.com/workspaces/{{targetWorkspaceId_updateRoles}}/roles",
+          "protocol": "https",
+          "host": [
+            "api",
+            "getpostman",
+            "com"
+          ],
+          "path": [
+            "workspaces",
+            "{{targetWorkspaceId_updateRoles}}",
+            "roles"
+          ]
+        },
+        "description": "### Estimated time per sets of API calls\n\nEach time you send this request, a 1 second delay occurs. This is built in to prevent rate limiting during Collection or Folder runs.\n\nThis accounts for the default rate limit on the `/workspaces` endpoint.\n\nIf your team has a high number of APIs in API Builder, you may want to start your run of the **Collection runner requests** folder while you need to do other tasks.\n\n- 10,000 API elements / \\~167 minutes\n    \n- 5,000 API elements / \\~84 minutes\n    \n- 1000 API elements / \\~17 minutes"
+      },
+      "response": []
+    },
+    {
+      "name": "Get and store API info",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "let apiInfo = pm.collectionVariables.get(\"apiInfo\");",
+              "let apiCounter = pm.collectionVariables.get('apiCounter')",
+              "console.log(apiInfo[apiCounter]['apiId'])",
+              "pm.collectionVariables.set('targetApi', apiInfo[apiCounter]['apiId'])"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "let apiInfo = pm.collectionVariables.get(\"apiInfo\")",
+              "let apiCounter = pm.collectionVariables.get('apiCounter')",
+              "",
+              "let res = pm.response.json()",
+              "",
+              "if (apiCounter < apiInfo.length-1) {",
+              "    apiInfo[apiCounter].name = res.api.name ? res.api.name : `No name found for API ${res.api.id}`",
+              "    apiInfo[apiCounter].summary = res.api.summary ? res.api.summary : `API ${res.api.id}\\n SUMMARY`",
+              "    apiInfo[apiCounter].description = res.api.description ? res.api.description : `API ${res.api.id}\\n DESCRIPTION`",
+              "    apiInfo[apiCounter].isPublic = res.api.isPublic ? res.api.isPublic : false // default to false",
+              "    apiInfo[apiCounter].versions = res.api.versions ? res.api.versions : `No versions found for API ${res.api.id}`",
+              "    pm.collectionVariables.set(\"apiInfo\", apiInfo)",
+              "    pm.execution.setNextRequest(\"Get and store API info\")",
+              "} else if (apiCounter >= apiInfo.length-1) {",
+              "    apiInfo[apiCounter].name = res.api.name ? res.api.name : `No name found for API ${res.api.id}`",
+              "    apiInfo[apiCounter].summary = res.api.summary ? res.api.summary : `Summary for API ${res.api.id}`",
+              "    apiInfo[apiCounter].description = res.api.description ? res.api.description : `Description for API ${res.api.id}`",
+              "    apiInfo[apiCounter].isPublic = res.api.isPublic ? res.api.isPublic : false // default to false",
+              "    apiInfo[apiCounter].versions = res.api.versions ? res.api.versions : `No versions found for API ${res.api.id}`",
+              "    pm.collectionVariables.set(\"apiInfo\", apiInfo)",
+              "    console.log(res)",
+              "    console.log(`Cycled through all available APIs, exiting...`)",
+              "    pm.collectionVariables.set(\"apiCounter\", parseInt(0))",
+              "    console.log(pm.collectionVariables.get(\"apiInfo\"))",
+              "    pm.execution.setNextRequest(null)",
+              "    return",
+              "} else {",
+              "    console.log(`Something went wrong: ${JSON.stringify(pm.response.json())}`)",
+              "}",
+              "",
+              "pm.collectionVariables.set(\"apiCounter\", apiCounter += 1)"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "https://api.getpostman.com/apis/{{targetApi}}",
+          "protocol": "https",
+          "host": [
+            "api",
+            "getpostman",
+            "com"
+          ],
+          "path": [
+            "apis",
+            "{{targetApi}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get and store API gitInfo",
+      "request": {
+        "method": "GET",
+        "header": []
+      },
+      "response": []
+    },
+    {
+      "name": "Create workspace",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"workspace\": {\n        \"name\": \"{{new_workspace_name}}\",\n        \"type\": \"{{workspaceType}}\",\n        \"description\": \"{{workspaceDescription}}\"\n        // \"teamId\": \"{{teamId}}\" // Optional field, only required if the workspace is to be created for a specific team.\n    }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://api.getpostman.com/workspaces",
+          "protocol": "https",
+          "host": [
+            "api",
+            "getpostman",
+            "com"
+          ],
+          "path": [
+            "workspaces"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "value",
+        "value": "{{vault:pm-api-key}}",
+        "type": "string"
+      },
+      {
+        "key": "key",
+        "value": "x-api-key",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "apiInfo",
+      "value": ""
+    },
+    {
+      "key": "apiCounter",
+      "value": ""
+    },
+    {
+      "key": "rateLimitController",
+      "value": ""
+    },
+    {
+      "key": "totalCounter",
+      "value": ""
+    },
+    {
+      "key": "targetApiId",
+      "value": ""
+    },
+    {
+      "key": "workpaceCounter",
+      "value": ""
+    },
+    {
+      "key": "targetWorkspaceId",
+      "value": ""
+    },
+    {
+      "key": "targetWorkspaceId_toTag",
+      "value": ""
+    },
+    {
+      "key": "workspacesToTag",
+      "value": ""
+    },
+    {
+      "key": "workspaceCounter",
+      "value": ""
+    },
+    {
+      "key": "rolesCounter",
+      "value": ""
+    },
+    {
+      "key": "targetWorkspaceId_updateRoles",
+      "value": ""
+    },
+    {
+      "key": "workspacesInfo",
+      "value": ""
+    },
+    {
+      "key": "targetApi",
+      "value": ""
+    }
+  ]
+}

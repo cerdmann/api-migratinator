@@ -1,6 +1,14 @@
-# api-migratinator
+# API Migratinator
+
+## M.O.A.T. — Migrate Old APIs Today
 
 A scripted migration tool for moving large customer API Builder assets to V12 Spec Hub, using the git repo as the source of truth.
+
+```
+moat migrate
+moat discover
+moat status
+```
 
 ---
 
@@ -55,17 +63,46 @@ Repeat until you have enough APIs to exercise the tool at the scale you want to 
 
 ### 4. Configure the tool
 
-The tool auto-discovers all workspaces and APIs scoped to the provided API key — no workspace IDs required. Copy the example env file and fill in your values:
+The tool auto-discovers all workspaces and APIs scoped to the provided API key — no workspace IDs required. A new dedicated workspace is created per API during migration, since V12 links one workspace to one git repo.
 
-```bash
-cp .env.example .env
+Create a `moat.config.json` in the project root:
+
+```json
+{
+  "postmanApiKey": "your-admin-api-key",
+  "gitToken": "your-github-or-gitlab-pat",
+  "workspacePattern": "{workspace} - {spec}"
+}
 ```
+
+Sensitive values can be provided as env vars instead and will take precedence over the config file:
 
 ```
 POSTMAN_API_KEY=your-admin-api-key
-TARGET_WORKSPACE_NAME=Migration Output
 GIT_TOKEN=your-github-or-gitlab-pat
 ```
+
+#### Workspace naming pattern
+
+Each migrated API gets its own new Postman workspace. The `workspacePattern` controls how it is named using tokens from the source API's metadata:
+
+| Token | Description | Example |
+|---|---|---|
+| `{workspace}` | Source workspace name | `Payments Team` |
+| `{spec}` | API Builder API name | `Payments API` |
+| `{repo}` | Git repository name | `payments-api` |
+| `{org}` | Git organisation or owner | `acme-corp` |
+| `{branch}` | Git branch | `main` |
+
+The pattern can also be passed as a CLI flag, which takes precedence over the config file:
+
+```bash
+moat migrate --workspace-pattern "{org}/{repo}"
+```
+
+Precedence: **CLI flag → env var → moat.config.json → default (`{workspace} - {spec}`)**
+
+`moat discover` will perform a collision check on generated workspace names before any migration runs and will warn if duplicates are detected.
 
 ### 5. Verify your setup
 
@@ -73,10 +110,10 @@ Once the tool is built, you can do a dry-run discovery to confirm it can see all
 
 ```bash
 # coming soon
-pnpm run discover
+moat discover
 ```
 
-This will page through all workspaces in your team, list every API Builder API found, indicate whether each is git-linked, and print the resolved repo metadata — without making any changes.
+This will page through all workspaces in your team, list every API Builder API found, indicate whether each is git-linked, check for workspace name collisions using your configured pattern, and print the resolved repo metadata — without making any changes.
 
 ---
 

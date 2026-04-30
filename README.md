@@ -65,7 +65,14 @@ Repeat until you have enough APIs to exercise the tool at the scale you want to 
 
 The tool auto-discovers all workspaces and APIs scoped to the provided API key — no workspace IDs required. A new dedicated workspace is created per API during migration, since V12 links one workspace to one git repo.
 
-Create a `moat.config.json` in the project root:
+`moat` looks for config in this order, using the first file it finds:
+
+| Location | When to use |
+|---|---|
+| `./moat.config.json` | Project-level override (checked first) |
+| `~/.moat.config.json` | Global config — set once, works from any directory |
+
+If installed globally, create `~/.moat.config.json` in your home directory:
 
 ```json
 {
@@ -75,7 +82,7 @@ Create a `moat.config.json` in the project root:
 }
 ```
 
-Sensitive values can be provided as env vars instead and will take precedence over the config file:
+Env vars always take precedence over both config files — useful for CI/CD:
 
 ```
 POSTMAN_API_KEY=your-admin-api-key

@@ -1,7 +1,7 @@
 import { Command } from 'commander';
-import { readFile } from 'fs/promises';
 import { spawn } from 'child_process';
 import { loadConfig } from '../../config/loader.js';
+import { resolveConfigFile } from '../../config/file.js';
 import { createPostmanClient } from '../../postman/client.js';
 import { runDiscover } from '../../migration/discover.js';
 import { runMigrate } from '../../migration/migrate.js';
@@ -22,33 +22,49 @@ export const migrateCommand = new Command('migrate')
   .option('--checkpoint <path>', 'Path to checkpoint file for resume support', '.moat-checkpoint.json')
   .option('--dry-run', 'Preview what would be migrated without making changes')
   .action(async (options) => {
-    let configFile: Record<string, unknown> = {};
-    try {
-      const raw = await readFile('moat.config.json', 'utf-8');
-      configFile = JSON.parse(raw);
-    } catch {
-      // no config file — rely on env vars
-    }
+    const configFile = await resolveConfigFile();
 
-    const config = await loadConfig({
-      configFile,
-      cliArgs: options.workspacePattern ? { workspacePattern: options.workspacePattern } : undefined,
-    });
+    let config;
+    try {
+      config = await loadConfig({
+        configFile,
+        cliArgs: options.workspacePattern ? { workspacePattern: options.workspacePattern } : undefined,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`\n${message}`);
+      console.error('\nCreate a moat.config.json (see moat.config.json.example) or set POSTMAN_API_KEY and GIT_TOKEN env vars.');
+      process.exit(1);
+    }
 
     const client = createPostmanClient({ apiKey: config.postmanApiKey });
 
     console.log('Discovering APIs...\n');
-    const discovery = await runDiscover(client, config.workspacePattern);
+    let discovery;
+    try {
+      discovery = await runDiscover(client, config.workspacePattern);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`\nFailed to discover APIs: ${message}`);
+      console.error('Check that your POSTMAN_API_KEY is valid and has admin access.');
+      process.exit(1);
+    }
 
     if (discovery.collisions.length > 0) {
-      console.error(`⚠ Workspace name collisions detected. Run \`moat discover\` and resolve before migrating.`);
+      console.error(`\n⚠ Workspace name collisions detected (${discovery.collisions.length}):`);
+      discovery.collisions.forEach(name => console.error(`  - "${name}"`));
+      console.error('\nRun `moat discover` to review and adjust --workspace-pattern before migrating.');
       process.exit(1);
     }
 
     console.log(`Found ${discovery.apis.length} APIs (${discovery.gitLinked.length} git-linked, ${discovery.nonGitLinked.length} non-git-linked)\n`);
 
     if (options.dryRun) {
-      console.log('Dry run — no changes made.');
+      console.log('Dry run — no changes will be made.\n');
+      for (const api of discovery.apis) {
+        const path = api.gitInfo ? 'Path A (git)' : 'Path B (no-git)';
+        console.log(`  [${path}] ${api.workspaceName} / ${api.name}  →  "${api.resolvedWorkspaceName}"`);
+      }
       return;
     }
 
@@ -65,5 +81,6 @@ export const migrateCommand = new Command('migrate')
     if (result.failed.length > 0) {
       console.log('\nFailed APIs:');
       result.failed.forEach(f => console.log(`  - ${f.id}: ${f.error}`));
+      console.log(`\nRun \`moat status\` for details. Re-run \`moat migrate\` to retry failed APIs.`);
     }
   });

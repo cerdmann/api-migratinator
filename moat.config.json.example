@@ -1,0 +1,5 @@
+{
+  "postmanApiKey": "your-admin-api-key",
+  "gitToken": "your-github-or-gitlab-pat",
+  "workspacePattern": "{workspace} - {spec}"
+}

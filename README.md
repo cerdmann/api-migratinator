@@ -124,7 +124,7 @@ See [`docs/design.md`](docs/design.md) for the full migration design.
 ## Development
 
 ```bash
-pnpm install
-pnpm run build
-pnpm run test
+npm install
+npm run build
+npm test
 ```

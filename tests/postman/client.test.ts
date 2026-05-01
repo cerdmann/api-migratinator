@@ -32,4 +32,14 @@ describe('createPostmanClient', () => {
     expect(client.getRateLimiterType('GET', '/workspaces/abc/roles')).toBe('workspace');
     expect(client.getRateLimiterType('PUT', '/workspaces/abc/tags')).toBe('workspace');
   });
+
+  it('accepts per-request header overrides on get', () => {
+    const client = createPostmanClient({ apiKey: 'pk-test' });
+    expect(() => client.get('/test', undefined, { 'Accept': 'application/vnd.api.v10+json' })).not.toThrow();
+  });
+
+  it('accepts per-request header overrides on post', () => {
+    const client = createPostmanClient({ apiKey: 'pk-test' });
+    expect(() => client.post('/test', {}, { 'Accept': 'application/vnd.api.v10+json' })).not.toThrow();
+  });
 });

@@ -40,14 +40,17 @@ const nonGitApi: DiscoveredApi = {
   resolvedWorkspaceName: 'Alpha Team - Billing API',
 };
 
-function makeClient(responses: Record<string, unknown>): PostmanClient {
+function makeClient(
+  postResponses: Record<string, unknown>,
+  getResponses: Record<string, unknown> = {}
+): PostmanClient {
   return {
     get: vi.fn(async (path: string) => {
-      if (path in responses) return responses[path];
+      if (path in getResponses) return getResponses[path];
       throw new Error(`Unexpected GET ${path}`);
     }),
     post: vi.fn(async (path: string) => {
-      if (path in responses) return responses[path];
+      if (path in postResponses) return postResponses[path];
       throw new Error(`Unexpected POST ${path}`);
     }),
     put: vi.fn(),
@@ -60,10 +63,10 @@ function makeClient(responses: Record<string, unknown>): PostmanClient {
 describe('runMigrate', () => {
   it('routes git-linked APIs through Path A', async () => {
     const spawnCli = vi.fn().mockResolvedValue(undefined);
-    const client = makeClient({
-      '/apis/api-git/spec-migrations': { taskId: 'task-1' },
-      '/apis/api-git/tasks/task-1': { status: 'completed' },
-    });
+    const client = makeClient(
+      { '/apis/api-git/spec-migrations': { message: 'Moving to Spec Hub started successfully', success: true } },
+      { '/apis/api-git/spec-migrations': { status: 'completed' } }
+    );
 
     const result = await runMigrate(client, [gitApi], {
       spawnCli,
@@ -79,12 +82,13 @@ describe('runMigrate', () => {
 
   it('routes non-git APIs through Path B', async () => {
     const spawnCli = vi.fn().mockResolvedValue(undefined);
-    const client = makeClient({
-      '/apis/api-nogit/schemas': { schemas: [{ id: 'schema-1', type: 'openapi:3_1' }] },
-      '/apis/api-nogit/schemas/schema-1/files': { files: [{ path: 'openapi.yaml', content: '' }] },
-      '/workspaces': { id: 'new-ws-1' },
-      '/specs': { id: 'spec-1' },
-    });
+    const client = makeClient(
+      { '/workspaces': { id: 'new-ws-1' }, '/specs': { id: 'spec-1' } },
+      {
+        '/apis/api-nogit/schemas': { schemas: [{ id: 'schema-1', type: 'openapi:3_1' }] },
+        '/apis/api-nogit/schemas/schema-1/files': { files: [{ path: 'openapi.yaml', content: '' }] },
+      }
+    );
 
     const result = await runMigrate(client, [nonGitApi], {
       spawnCli,
@@ -100,14 +104,18 @@ describe('runMigrate', () => {
 
   it('records failed APIs without stopping the run', async () => {
     const spawnCli = vi.fn().mockResolvedValue(undefined);
-    const client = makeClient({
-      '/apis/api-git/spec-migrations': { taskId: 'task-fail' },
-      '/apis/api-git/tasks/task-fail': { status: 'failed', error: 'Repo not found' },
-      '/apis/api-nogit/schemas': { schemas: [{ id: 'schema-1', type: 'openapi:3_1' }] },
-      '/apis/api-nogit/schemas/schema-1/files': { files: [{ path: 'openapi.yaml', content: '' }] },
-      '/workspaces': { id: 'new-ws-1' },
-      '/specs': { id: 'spec-1' },
-    });
+    const client = makeClient(
+      {
+        '/apis/api-git/spec-migrations': { message: 'Moving to Spec Hub started successfully', success: true },
+        '/workspaces': { id: 'new-ws-1' },
+        '/specs': { id: 'spec-1' },
+      },
+      {
+        '/apis/api-git/spec-migrations': { status: 'failed', error: 'Repo not found' },
+        '/apis/api-nogit/schemas': { schemas: [{ id: 'schema-1', type: 'openapi:3_1' }] },
+        '/apis/api-nogit/schemas/schema-1/files': { files: [{ path: 'openapi.yaml', content: '' }] },
+      }
+    );
 
     const result = await runMigrate(client, [gitApi, nonGitApi], {
       spawnCli,
@@ -124,12 +132,13 @@ describe('runMigrate', () => {
 
   it('skips APIs already marked completed in checkpoint', async () => {
     const spawnCli = vi.fn().mockResolvedValue(undefined);
-    const client = makeClient({
-      '/apis/api-nogit/schemas': { schemas: [{ id: 'schema-1', type: 'openapi:3_1' }] },
-      '/apis/api-nogit/schemas/schema-1/files': { files: [{ path: 'openapi.yaml', content: '' }] },
-      '/workspaces': { id: 'new-ws-1' },
-      '/specs': { id: 'spec-1' },
-    });
+    const client = makeClient(
+      { '/workspaces': { id: 'new-ws-1' }, '/specs': { id: 'spec-1' } },
+      {
+        '/apis/api-nogit/schemas': { schemas: [{ id: 'schema-1', type: 'openapi:3_1' }] },
+        '/apis/api-nogit/schemas/schema-1/files': { files: [{ path: 'openapi.yaml', content: '' }] },
+      }
+    );
 
     const cpPath = join(dir, 'cp.json');
 

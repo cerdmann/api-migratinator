@@ -19,14 +19,17 @@ const gitApi: DiscoveredApi = {
   },
 };
 
-function makeClient(responses: Record<string, unknown>): PostmanClient {
+function makeClient(
+  postResponses: Record<string, unknown>,
+  getResponses: Record<string, unknown> = {}
+): PostmanClient {
   return {
     get: vi.fn(async (path: string) => {
-      if (path in responses) return responses[path];
+      if (path in getResponses) return getResponses[path];
       throw new Error(`Unexpected GET ${path}`);
     }),
     post: vi.fn(async (path: string) => {
-      if (path in responses) return responses[path];
+      if (path in postResponses) return postResponses[path];
       throw new Error(`Unexpected POST ${path}`);
     }),
     put: vi.fn(),
@@ -39,10 +42,10 @@ function makeClient(responses: Record<string, unknown>): PostmanClient {
 describe('migratePathA', () => {
   it('starts spec migration and polls to completion', async () => {
     const spawnCli = vi.fn().mockResolvedValue(undefined);
-    const client = makeClient({
-      '/apis/api-git/spec-migrations': { taskId: 'task-1', success: true },
-      '/apis/api-git/tasks/task-1': { status: 'completed' },
-    });
+    const client = makeClient(
+      { '/apis/api-git/spec-migrations': { message: 'Moving to Spec Hub started successfully', success: true } },
+      { '/apis/api-git/spec-migrations': { status: 'completed' } }
+    );
 
     const result = await migratePathA(client, gitApi, { spawnCli, pollIntervalMs: 0 });
 
@@ -51,16 +54,17 @@ describe('migratePathA', () => {
       '/apis/api-git/spec-migrations',
       expect.objectContaining({
         workspaceInfo: { name: 'Alpha Team - Payments API' },
-      })
+      }),
+      expect.any(Object)
     );
   });
 
   it('calls postman workspace push after migration completes', async () => {
     const spawnCli = vi.fn().mockResolvedValue(undefined);
-    const client = makeClient({
-      '/apis/api-git/spec-migrations': { taskId: 'task-1', success: true },
-      '/apis/api-git/tasks/task-1': { status: 'completed' },
-    });
+    const client = makeClient(
+      { '/apis/api-git/spec-migrations': { message: 'Moving to Spec Hub started successfully', success: true } },
+      { '/apis/api-git/spec-migrations': { status: 'completed' } }
+    );
 
     await migratePathA(client, gitApi, { spawnCli, pollIntervalMs: 0 });
 
@@ -71,10 +75,10 @@ describe('migratePathA', () => {
 
   it('uses gitInfo schemaFolder as gitPath', async () => {
     const spawnCli = vi.fn().mockResolvedValue(undefined);
-    const client = makeClient({
-      '/apis/api-git/spec-migrations': { taskId: 'task-1', success: true },
-      '/apis/api-git/tasks/task-1': { status: 'completed' },
-    });
+    const client = makeClient(
+      { '/apis/api-git/spec-migrations': { message: 'Moving to Spec Hub started successfully', success: true } },
+      { '/apis/api-git/spec-migrations': { status: 'completed' } }
+    );
 
     await migratePathA(client, gitApi, { spawnCli, pollIntervalMs: 0 });
 
@@ -82,16 +86,17 @@ describe('migratePathA', () => {
       '/apis/api-git/spec-migrations',
       expect.objectContaining({
         gitInfo: { path: '/' },
-      })
+      }),
+      expect.any(Object)
     );
   });
 
   it('throws when migration task fails', async () => {
     const spawnCli = vi.fn().mockResolvedValue(undefined);
-    const client = makeClient({
-      '/apis/api-git/spec-migrations': { taskId: 'task-fail', success: true },
-      '/apis/api-git/tasks/task-fail': { status: 'failed', error: 'Repo not accessible' },
-    });
+    const client = makeClient(
+      { '/apis/api-git/spec-migrations': { message: 'Moving to Spec Hub started successfully', success: true } },
+      { '/apis/api-git/spec-migrations': { status: 'failed', error: 'Repo not accessible' } }
+    );
 
     await expect(
       migratePathA(client, gitApi, { spawnCli, pollIntervalMs: 0 })

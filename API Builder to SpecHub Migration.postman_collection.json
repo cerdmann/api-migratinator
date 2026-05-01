@@ -1,0 +1,595 @@
+{
+  "info": {
+    "_postman_id": "efad211f-9e2d-4e8d-ae37-7205291110bf",
+    "name": "API Builder to SpecHub Migration",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "32902321",
+    "_collection_link": "https://go.postman.co/collection/12420868-efad211f-9e2d-4e8d-ae37-7205291110bf?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Migrate API Builder",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// Log migration start result",
+              "const apiId = pm.iterationData.get(\"apiId\");",
+              "console.log(\"Migration started for apiId: \" + apiId);",
+              "console.log(\"Response status: \" + pm.response.status);",
+              "console.log(\"Response body: \" + pm.response.text());",
+              "",
+              "// Save apiId to collection variable for use in \"Get migration status\"",
+              "pm.collectionVariables.set(\"currentApiId\", pm.iterationData.get(\"apiId\"));",
+              "",
+              "// Check response status",
+              "pm.test(\"Migration initiated successfully\", function () {",
+              "    const success = pm.response.code === 200 || pm.response.code === 201 || pm.response.code === 202;",
+              "    if (success) {",
+              "        console.log(\"✅ Migration successfully initiated for apiId: \" + apiId);",
+              "    } else {",
+              "        console.log(\"❌ Migration failed to initiate for apiId: \" + apiId + \" | Status: \" + pm.response.code);",
+              "    }",
+              "    pm.expect(success).to.be.true;",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        },
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Conditionally build request body based on iteration data",
+              "const workspaceId = pm.iterationData.get(\"workspaceId\");",
+              "const workspaceName = pm.iterationData.get(\"workspaceName\");",
+              "",
+              "let body;",
+              "if (workspaceId) {",
+              "    body = { workspaceId: workspaceId };",
+              "} else if (workspaceName) {",
+              "    body = { workspaceInfo: { name: workspaceName } };",
+              "} else {",
+              "    console.log(\"⚠️ Neither workspaceId nor workspaceName provided for apiId: \" + pm.iterationData.get(\"apiId\"));",
+              "}",
+              "",
+              "if (body) {",
+              "    pm.request.body.update({",
+              "        mode: \"raw\",",
+              "        raw: JSON.stringify(body),",
+              "        options: { raw: { language: \"json\" } }",
+              "    });",
+              "    console.log(\"Request body set to: \" + JSON.stringify(body));",
+              "}"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "apikey",
+          "apikey": [
+            {
+              "key": "value",
+              "value": "{{apiKey}}",
+              "type": "string"
+            },
+            {
+              "key": "key",
+              "value": "x-api-key",
+              "type": "string"
+            },
+            {
+              "key": "in",
+              "value": "header",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/vnd.api.v10+json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"workspaceId\": \"{{workspaceId}}\"\n}\n\n// Use the following request body to migrate an API Builder definition into a new workspace:\n// {\n//    \"workspaceInfo\": {\n//        \"name\": \"{{workspaceName}}\"\n//   }\n//}\n\n// Use the following request body to migrate a Git-connected API Builder definition into a new workspace:\n//{\n//    \"workspaceInfo\": {\n//        \"name\": \"{{workspaceName}}\"\n//    },\n//    \"gitInfo\": {\n//        \"path\": \"{{gitPath}}\"\n//    }\n//}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/apis/:apiId/spec-migrations",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "apis",
+            ":apiId",
+            "spec-migrations"
+          ],
+          "variable": [
+            {
+              "key": "apiId",
+              "value": "{{apiId}}"
+            }
+          ]
+        },
+        "description": "Initiates a migration of an API from API Builder to Spec Hub. This endpoint triggers the migration process for a specified API, moving it to the new Spec Hub architecture within a target workspace.\n\n## Path Variables\n\n| Variable | Type | Required | Description |\n| --- | --- | --- | --- |\n| `apiId` | string (UUID) | Yes | The unique identifier of the API to migrate from API Builder |\n\n## Headers\n\n| Header | Value | Required | Description |\n| --- | --- | --- | --- |\n| `Accept` | `application/vnd.api.v10+json` | Yes | Specifies the API version for the response format |\n\n## Request Body\n\n#### Migrate to an existing workspace\n\n``` json\n{\n  \"workspaceId\": \"03dce2f4-89f5-4344-9b85-18a0f13f9f86\"\n}\n\n ```\n\n| Field | Type | Required | Description |\n| --- | --- | --- | --- |\n| `workspaceId` | string (UUID) | Yes | The target workspace ID where the migrated API will be placed in Spec Hub. |\n\n#### Migrate to a new workspace\n\n``` json\n{\n    \"workspaceInfo\": {\n        \"name\": \"{{workspaceName}}\"\n    },\n    \"gitInfo\": {\n       \"path\": \"{{gitPath}}\"\n    }\n}\n\n ```\n\n| **Field** | **Type** | **Required** | **Description** |\n| --- | --- | --- | --- |\n| `workspaceInfo` | object | Yes | The target workspace ID where the migrated API will be placed in Spec Hub. |\n| `gitInfo` | object |  | Contains info about the connected remote Git repository. |\n| `gitInfo.path` | string |  | The directory path in the remote repository containing the API's collections and definitions. This property expects an absolute path and only contains alphanumeric characters, slashes, hyphens, underscores, and periods. It cannot contain path traversal sequences (`\\..\\`). |\n\n## Usage Notes\n\n- The migration is an asynchronous operation. After initiating the migration, use the [Get migration status](https://request/12420868-879eac37-ddcb-4f81-927e-7bff567b1441) endpoint (GET request to the same path) to check the progress and completion status.\n    \n- Ensure the target `workspaceId` exists and you have appropriate permissions to create resources in that workspace.\n    \n- The original API in API Builder remains unchanged until the migration completes successfully.\n    \n- This endpoint is part of the transition from the legacy API Builder to the newer Spec Hub architecture."
+      },
+      "response": [
+        {
+          "name": "Migrate to Existing Workspace",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/vnd.api.v10+json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"workspaceId\": \"1f0df51a-8658-4ee8-a2a1-d2567dfa09a9\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/apis/:apiId/spec-migrations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "apis",
+                ":apiId",
+                "spec-migrations"
+              ],
+              "variable": [
+                {
+                  "key": "apiId",
+                  "value": "{{apiId}}"
+                }
+              ]
+            }
+          },
+          "status": "Accepted",
+          "code": 202,
+          "_postman_previewlanguage": "json",
+          "header": [],
+          "cookie": [],
+          "body": "{\n    \"message\": \"Moving to Spec Hub started successfully\",\n    \"success\": true\n}"
+        },
+        {
+          "name": "Migrate to a New Workspace",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/vnd.api.v10+json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"workspaceInfo\": {\n        \"name\": \"API Workspace\"\n    }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/apis/:apiId/spec-migrations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "apis",
+                ":apiId",
+                "spec-migrations"
+              ],
+              "variable": [
+                {
+                  "key": "apiId",
+                  "value": "{{apiId}}"
+                }
+              ]
+            }
+          },
+          "status": "Accepted",
+          "code": 202,
+          "_postman_previewlanguage": "json",
+          "header": [],
+          "cookie": [],
+          "body": "{\n    \"message\": \"Moving to Spec Hub started successfully\",\n    \"success\": true\n}"
+        },
+        {
+          "name": "Migrate Git-connected API to New Workspace",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/vnd.api.v10+json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"workspaceInfo\": {\n        \"name\": \"API Workspace\"\n    },\n    \"gitInfo\": {\n        \"path\": \"/spaceships\"\n    }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/apis/:apiId/spec-migrations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "apis",
+                ":apiId",
+                "spec-migrations"
+              ],
+              "variable": [
+                {
+                  "key": "apiId",
+                  "value": "{{apiId}}"
+                }
+              ]
+            }
+          },
+          "status": "Accepted",
+          "code": 202,
+          "_postman_previewlanguage": "json",
+          "header": [],
+          "cookie": [],
+          "body": "{\n    \"message\": \"Moving to Spec Hub started successfully\",\n    \"success\": true\n}"
+        },
+        {
+          "name": "Empty API Migration",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/vnd.api.v10+json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"workspaceId\": \"1f0df51a-8658-4ee8-a2a1-d2567dfa09a9\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/apis/:apiId/spec-migrations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "apis",
+                ":apiId",
+                "spec-migrations"
+              ],
+              "variable": [
+                {
+                  "key": "apiId",
+                  "value": "{{apiId}}"
+                }
+              ]
+            }
+          },
+          "status": "Accepted",
+          "code": 202,
+          "_postman_previewlanguage": "json",
+          "header": [],
+          "cookie": [],
+          "body": "{\n    \"message\": \"This API doesn't have any API Definition or Collection\",\n    \"success\": true\n}"
+        },
+        {
+          "name": "Unsupported Definition Type",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/vnd.api.v10+json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"workspaceId\": \"1f0df51a-8658-4ee8-a2a1-d2567dfa09a9\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/apis/:apiId/spec-migrations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "apis",
+                ":apiId",
+                "spec-migrations"
+              ],
+              "variable": [
+                {
+                  "key": "apiId",
+                  "value": "{{apiId}}"
+                }
+              ]
+            }
+          },
+          "status": "Bad Request",
+          "code": 400,
+          "_postman_previewlanguage": "json",
+          "header": [],
+          "cookie": [],
+          "body": "{\n    \"error\": {\n        \"title\": \"Definition type not supported\",\n        \"message\": \"This API contains an unsupported definition type wsdl:1.0. Spec Hub supports: OAS3, OAS3.1, OAS2.0, AsyncAPI2.0, graphQl, gRPC.\"\n    }\n}"
+        },
+        {
+          "name": "Repo Linked to Another Workspace",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/vnd.api.v10+json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"workspaceInfo\": {\n        \"name\": \"API Workspace\"\n    },\n    \"gitInfo\": {\n        \"path\": \"/spaceships\"\n    }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/apis/:apiId/spec-migrations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "apis",
+                ":apiId",
+                "spec-migrations"
+              ],
+              "variable": [
+                {
+                  "key": "apiId",
+                  "value": "{{apiId}}"
+                }
+              ]
+            }
+          },
+          "status": "Bad Request",
+          "code": 400,
+          "_postman_previewlanguage": "json",
+          "header": [],
+          "cookie": [],
+          "body": "{\n    \"error\": {\n        \"title\": \"Moving to Spec Hub not possible\",\n        \"details\": {\n            \"workspaceId\": \"1f0df51a-8658-4ee8-a2a1-d2567dfa09a9\"\n        },\n        \"message\": \"The git repository is already linked to another workspace. Please reach out to Postman support for assistance.\"\n    }\n}"
+        },
+        {
+          "name": "Invalid path Parameter",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/vnd.api.v10+json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"workspaceInfo\": {\n        \"name\": \"API Workspace\"\n    },\n    \"gitInfo\": {\n        \"path\": \"/../spaceships\"\n    }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/apis/:apiId/spec-migrations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "apis",
+                ":apiId",
+                "spec-migrations"
+              ],
+              "variable": [
+                {
+                  "key": "apiId",
+                  "value": "{{apiId}}"
+                }
+              ]
+            }
+          },
+          "status": "Bad Request",
+          "code": 400,
+          "_postman_previewlanguage": "json",
+          "header": [],
+          "cookie": [],
+          "body": "{\n    \"error\": {\n        \"type\": \"badRequest\",\n        \"name\": \"invalidGitInfoPath\",\n        \"message\": \"The provided path is invalid. It must be an absolute path starting with \\\\, contain only alphanumeric characters, slashes, hyphens, underscores, and dots, and must not contain \\\\..\\\\ path traversal sequences.\",\n        \"title\": \"Invalid path parameter\"\n    }\n}"
+        }
+      ]
+    },
+    {
+      "name": "Get migration status",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// Parse response body",
+              "const responseJson = pm.response.json();",
+              "console.log(\"Migration status response: \" + JSON.stringify(responseJson));",
+              "",
+              "// Extract status field (check common field names)",
+              "const status = (responseJson.status || responseJson.state || \"\").toLowerCase();",
+              "const currentApiId = pm.collectionVariables.get(\"currentApiId\");",
+              "",
+              "console.log(\"Migration status for apiId \" + currentApiId + \": \" + status);",
+              "",
+              "// Retry counter logic to avoid infinite loops (max 10 retries)",
+              "let retries = pm.collectionVariables.get(\"retryCount\") || 0;",
+              "retries = parseInt(retries);",
+              "",
+              "if (status === \"pending\" || status === \"running\" || status === \"in_progress\") {",
+              "    if (retries < 10) {",
+              "        pm.collectionVariables.set(\"retryCount\", retries + 1);",
+              "        console.log(\"⏳ Migration still in progress. Retry attempt: \" + (retries + 1) + \"/10 for apiId: \" + currentApiId + \". Waiting 2 seconds before retrying...\");",
+              "        // 2-second delay before retrying",
+              "        setTimeout(function () {}, 2000);",
+              "        pm.execution.setNextRequest(\"Get migration status\");",
+              "    } else {",
+              "        pm.collectionVariables.set(\"retryCount\", 0);",
+              "        console.log(\"⚠️ Max retries reached for apiId: \" + currentApiId + \". Moving to next iteration.\");",
+              "    }",
+              "} else if (status === \"completed\" || status === \"success\") {",
+              "    pm.collectionVariables.set(\"retryCount\", 0);",
+              "    console.log(\"✅ Migration completed successfully for apiId: \" + currentApiId);",
+              "} else if (status === \"failed\" || status === \"error\") {",
+              "    pm.collectionVariables.set(\"retryCount\", 0);",
+              "    console.log(\"❌ Migration failed for apiId: \" + currentApiId + \" | Status: \" + status);",
+              "} else {",
+              "    pm.collectionVariables.set(\"retryCount\", 0);",
+              "    console.log(\"ℹ️ Unknown migration status: \" + status + \" for apiId: \" + currentApiId);",
+              "}",
+              "",
+              "pm.test(\"Migration status check\", function () {",
+              "    pm.expect(pm.response.code).to.equal(200);",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "auth": {
+          "type": "apikey",
+          "apikey": [
+            {
+              "key": "value",
+              "value": "{{apiKey}}",
+              "type": "string"
+            },
+            {
+              "key": "key",
+              "value": "x-api-key",
+              "type": "string"
+            },
+            {
+              "key": "in",
+              "value": "header",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/vnd.api.v10+json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/apis/:apiId/spec-migrations",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "apis",
+            ":apiId",
+            "spec-migrations"
+          ],
+          "variable": [
+            {
+              "key": "apiId",
+              "value": "{{currentApiId}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (pm.info.requestName === \"Migrate API Builder\") {",
+          "    pm.collectionVariables.set(\"retryCount\", 0);",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "migrationResults",
+      "value": ""
+    },
+    {
+      "key": "lastMigrationResults",
+      "value": ""
+    },
+    {
+      "key": "retryCount",
+      "value": ""
+    },
+    {
+      "key": "currentApiId",
+      "value": ""
+    }
+  ]
+}

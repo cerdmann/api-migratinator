@@ -12,8 +12,8 @@ const WORKSPACE_CONCURRENCY = 10;
 const WORKSPACE_PATH_RE = /^\/workspaces/;
 
 export interface PostmanClient {
-  get: <T>(path: string, params?: Record<string, string>) => Promise<T>;
-  post: <T>(path: string, body?: unknown) => Promise<T>;
+  get: <T>(path: string, params?: Record<string, string>, headers?: Record<string, string>) => Promise<T>;
+  post: <T>(path: string, body?: unknown, headers?: Record<string, string>) => Promise<T>;
   put: <T>(path: string, body?: unknown) => Promise<T>;
   delete: <T>(path: string) => Promise<T>;
   getDefaultHeaders: () => Record<string, string>;
@@ -46,11 +46,11 @@ export function createPostmanClient({ apiKey }: { apiKey: string }): PostmanClie
   }
 
   return {
-    get: <T>(path: string, params?: Record<string, string>) =>
-      queue(path, () => instance.get<T>(path, { params }).then(r => r.data)),
+    get: <T>(path: string, params?: Record<string, string>, extraHeaders?: Record<string, string>) =>
+      queue(path, () => instance.get<T>(path, { params, headers: extraHeaders }).then(r => r.data)),
 
-    post: <T>(path: string, body?: unknown) =>
-      queue(path, () => instance.post<T>(path, body).then(r => r.data)),
+    post: <T>(path: string, body?: unknown, extraHeaders?: Record<string, string>) =>
+      queue(path, () => instance.post<T>(path, body, { headers: extraHeaders }).then(r => r.data)),
 
     put: <T>(path: string, body?: unknown) =>
       queue(path, () => instance.put<T>(path, body).then(r => r.data)),

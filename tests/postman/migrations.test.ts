@@ -1,15 +1,19 @@
 import { describe, it, expect, vi } from 'vitest';
-import { startSpecMigration, pollMigrationTask } from '../../src/postman/migrations.js';
+import {
+  startSpecMigration,
+  pollMigrationTask,
+  validateGitPath,
+} from '../../src/postman/migrations.js';
 import type { PostmanClient } from '../../src/postman/client.js';
 
-function makeClient(responses: Record<string, unknown>): PostmanClient {
+function makeClient(postResponses: Record<string, unknown>, getResponses: Record<string, unknown> = {}): PostmanClient {
   return {
     get: vi.fn(async (path: string) => {
-      if (path in responses) return responses[path];
+      if (path in getResponses) return getResponses[path];
       throw new Error(`Unexpected GET ${path}`);
     }),
     post: vi.fn(async (path: string) => {
-      if (path in responses) return responses[path];
+      if (path in postResponses) return postResponses[path];
       throw new Error(`Unexpected POST ${path}`);
     }),
     put: vi.fn(),
@@ -20,35 +24,92 @@ function makeClient(responses: Record<string, unknown>): PostmanClient {
 }
 
 describe('startSpecMigration', () => {
-  it('posts to spec-migrations and returns taskId', async () => {
+  it('posts to spec-migrations with workspaceInfo and gitInfo', async () => {
     const client = makeClient({
-      '/apis/api-1/spec-migrations': { taskId: 'task-abc', success: true },
+      '/apis/api-1/spec-migrations': { message: 'Moving to Spec Hub started successfully', success: true },
     });
 
     const result = await startSpecMigration(client, 'api-1', {
-      workspaceName: 'Payments Team - Payments API',
-      gitPath: '/payments',
-    });
-
-    expect(result.taskId).toBe('task-abc');
-    expect(client.post).toHaveBeenCalledWith('/apis/api-1/spec-migrations', {
-      workspaceInfo: { name: 'Payments Team - Payments API' },
+      workspaceInfo: { name: 'My Workspace' },
       gitInfo: { path: '/payments' },
     });
+
+    expect(result.started).toBe(true);
+    expect(result.empty).toBe(false);
+    expect(client.post).toHaveBeenCalledWith(
+      '/apis/api-1/spec-migrations',
+      { workspaceInfo: { name: 'My Workspace' }, gitInfo: { path: '/payments' } },
+      { Accept: 'application/vnd.api.v10+json' }
+    );
+  });
+
+  it('posts with workspaceId to migrate to existing workspace', async () => {
+    const client = makeClient({
+      '/apis/api-1/spec-migrations': { message: 'Moving to Spec Hub started successfully', success: true },
+    });
+
+    await startSpecMigration(client, 'api-1', {
+      workspaceId: 'existing-ws-uuid',
+    });
+
+    expect(client.post).toHaveBeenCalledWith(
+      '/apis/api-1/spec-migrations',
+      { workspaceId: 'existing-ws-uuid' },
+      { Accept: 'application/vnd.api.v10+json' }
+    );
+  });
+
+  it('detects empty API migration', async () => {
+    const client = makeClient({
+      '/apis/api-1/spec-migrations': {
+        message: "This API doesn't have any API Definition or Collection",
+        success: true,
+      },
+    });
+
+    const result = await startSpecMigration(client, 'api-1', {
+      workspaceInfo: { name: 'My Workspace' },
+    });
+
+    expect(result.empty).toBe(true);
+    expect(result.started).toBe(false);
+  });
+
+  it('throws on unsupported definition type', async () => {
+    const client: PostmanClient = {
+      get: vi.fn(),
+      post: vi.fn().mockRejectedValue(Object.assign(new Error('Definition type not supported'), {
+        response: { status: 400, data: { error: { title: 'Definition type not supported', message: 'This API contains an unsupported definition type wsdl:1.0.' } } },
+      })),
+      put: vi.fn(),
+      delete: vi.fn(),
+      getDefaultHeaders: vi.fn(() => ({})),
+      getRateLimiterType: vi.fn(() => 'general' as const),
+    };
+
+    await expect(startSpecMigration(client, 'api-1', { workspaceInfo: { name: 'ws' } }))
+      .rejects.toThrow('unsupported definition type');
+  });
+
+  it('throws on repo already linked to another workspace', async () => {
+    const client: PostmanClient = {
+      get: vi.fn(),
+      post: vi.fn().mockRejectedValue(Object.assign(new Error('repo linked'), {
+        response: { status: 400, data: { error: { message: 'The git repository is already linked to another workspace.' } } },
+      })),
+      put: vi.fn(),
+      delete: vi.fn(),
+      getDefaultHeaders: vi.fn(() => ({})),
+      getRateLimiterType: vi.fn(() => 'general' as const),
+    };
+
+    await expect(startSpecMigration(client, 'api-1', { workspaceInfo: { name: 'ws' } }))
+      .rejects.toThrow('already linked to another workspace');
   });
 });
 
 describe('pollMigrationTask', () => {
-  it('returns when task completes', async () => {
-    const client = makeClient({
-      '/apis/api-1/tasks/task-abc': { status: 'completed' },
-    });
-
-    const result = await pollMigrationTask(client, 'api-1', 'task-abc', { intervalMs: 0 });
-    expect(result.status).toBe('completed');
-  });
-
-  it('polls until task completes', async () => {
+  it('polls GET /apis/:apiId/spec-migrations until completed', async () => {
     let calls = 0;
     const client: PostmanClient = {
       get: vi.fn(async () => {
@@ -62,18 +123,83 @@ describe('pollMigrationTask', () => {
       getRateLimiterType: vi.fn(() => 'general' as const),
     };
 
-    const result = await pollMigrationTask(client, 'api-1', 'task-abc', { intervalMs: 0 });
+    const result = await pollMigrationTask(client, 'api-1', { intervalMs: 0 });
+    expect(result.status).toBe('completed');
+    expect(client.get).toHaveBeenCalledWith(
+      '/apis/api-1/spec-migrations',
+      undefined,
+      { Accept: 'application/vnd.api.v10+json' }
+    );
+  });
+
+  it('treats "success" status as completed', async () => {
+    const client: PostmanClient = {
+      get: vi.fn(async () => ({ status: 'success' })),
+      post: vi.fn(), put: vi.fn(), delete: vi.fn(),
+      getDefaultHeaders: vi.fn(() => ({})),
+      getRateLimiterType: vi.fn(() => 'general' as const),
+    };
+    const result = await pollMigrationTask(client, 'api-1', { intervalMs: 0 });
+    expect(result.status).toBe('completed');
+  });
+
+  it('treats "running" and "in_progress" as pending', async () => {
+    let calls = 0;
+    const statuses = ['running', 'in_progress', 'completed'];
+    const client: PostmanClient = {
+      get: vi.fn(async () => ({ status: statuses[calls++] })),
+      post: vi.fn(), put: vi.fn(), delete: vi.fn(),
+      getDefaultHeaders: vi.fn(() => ({})),
+      getRateLimiterType: vi.fn(() => 'general' as const),
+    };
+    const result = await pollMigrationTask(client, 'api-1', { intervalMs: 0 });
     expect(result.status).toBe('completed');
     expect(calls).toBe(3);
   });
 
-  it('throws when task fails', async () => {
-    const client = makeClient({
-      '/apis/api-1/tasks/task-fail': { status: 'failed', error: 'Something went wrong' },
-    });
+  it('throws on "failed" status', async () => {
+    const client: PostmanClient = {
+      get: vi.fn(async () => ({ status: 'failed', error: 'Repo not found' })),
+      post: vi.fn(), put: vi.fn(), delete: vi.fn(),
+      getDefaultHeaders: vi.fn(() => ({})),
+      getRateLimiterType: vi.fn(() => 'general' as const),
+    };
+    await expect(pollMigrationTask(client, 'api-1', { intervalMs: 0 }))
+      .rejects.toThrow('Repo not found');
+  });
 
-    await expect(
-      pollMigrationTask(client, 'api-1', 'task-fail', { intervalMs: 0 })
-    ).rejects.toThrow('Something went wrong');
+  it('throws on "error" status', async () => {
+    const client: PostmanClient = {
+      get: vi.fn(async () => ({ status: 'error', error: 'Internal error' })),
+      post: vi.fn(), put: vi.fn(), delete: vi.fn(),
+      getDefaultHeaders: vi.fn(() => ({})),
+      getRateLimiterType: vi.fn(() => 'general' as const),
+    };
+    await expect(pollMigrationTask(client, 'api-1', { intervalMs: 0 }))
+      .rejects.toThrow('Internal error');
+  });
+});
+
+describe('validateGitPath', () => {
+  it('accepts valid absolute paths', () => {
+    expect(() => validateGitPath('/')).not.toThrow();
+    expect(() => validateGitPath('/payments')).not.toThrow();
+    expect(() => validateGitPath('/my-org/payments_api')).not.toThrow();
+    expect(() => validateGitPath('/v1.0/specs')).not.toThrow();
+  });
+
+  it('rejects paths that do not start with /', () => {
+    expect(() => validateGitPath('payments')).toThrow('absolute');
+    expect(() => validateGitPath('payments/api')).toThrow('absolute');
+  });
+
+  it('rejects path traversal sequences', () => {
+    expect(() => validateGitPath('/../payments')).toThrow('traversal');
+    expect(() => validateGitPath('/payments/../secrets')).toThrow('traversal');
+  });
+
+  it('rejects invalid characters', () => {
+    expect(() => validateGitPath('/payments api')).toThrow('invalid characters');
+    expect(() => validateGitPath('/payments$api')).toThrow('invalid characters');
   });
 });

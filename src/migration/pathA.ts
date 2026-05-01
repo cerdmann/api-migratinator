@@ -1,5 +1,5 @@
 import type { PostmanClient } from '../postman/client.js';
-import { startSpecMigration, pollMigrationTask, type TaskResult } from '../postman/migrations.js';
+import { startSpecMigration, pollMigrationTask, validateGitPath, type TaskResult } from '../postman/migrations.js';
 import type { DiscoveredApi } from './discover.js';
 
 export interface PathAOptions {
@@ -19,12 +19,19 @@ export async function migratePathA(
 ): Promise<PathAResult> {
   const { spawnCli, pollIntervalMs = 3000 } = options;
 
-  const { taskId } = await startSpecMigration(client, api.id, {
-    workspaceName: api.resolvedWorkspaceName,
-    gitPath: api.gitInfo!.schemaFolder,
+  const gitPath = api.gitInfo?.schemaFolder ?? '/';
+  validateGitPath(gitPath);
+
+  const migrationResult = await startSpecMigration(client, api.id, {
+    workspaceInfo: { name: api.resolvedWorkspaceName },
+    gitInfo: { path: gitPath },
   });
 
-  const taskResult = await pollMigrationTask(client, api.id, taskId, {
+  if (migrationResult.empty) {
+    return { status: 'completed', taskResult: { status: 'completed' } };
+  }
+
+  const taskResult = await pollMigrationTask(client, api.id, {
     intervalMs: pollIntervalMs,
   });
 

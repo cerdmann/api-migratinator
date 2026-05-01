@@ -57,4 +57,6 @@ export const discoverCommand = new Command('discover')
       const tag = api.gitInfo ? '[git]    ' : '[no-git] ';
       console.log(`  ${tag} ${api.workspaceName} / ${api.name}  →  "${api.resolvedWorkspaceName}"`);
     }
+
+    process.exit(0);
   });

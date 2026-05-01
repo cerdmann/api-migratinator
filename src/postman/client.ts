@@ -21,9 +21,21 @@ export interface PostmanClient {
 }
 
 export function createPostmanClient({ apiKey }: { apiKey: string }): PostmanClient {
-  const headers = { 'X-API-Key': apiKey, 'Accept': 'application/json' };
+  const headers = { 'X-API-Key': apiKey };
 
   const instance: AxiosInstance = axios.create({ baseURL: BASE_URL, headers });
+
+  if (process.env.MOAT_DEBUG) {
+    instance.interceptors.request.use(config => {
+      console.error('[debug url]', config.method?.toUpperCase(), (config.baseURL ?? '') + (config.url ?? ''));
+      return config;
+    });
+    instance.interceptors.response.use(response => {
+      console.error('[debug response keys]', response.config.url, Object.keys(response.data ?? {}));
+      return response;
+    });
+  }
+
   axiosRetry(instance, {
     retries: 3,
     retryDelay: axiosRetry.exponentialDelay,

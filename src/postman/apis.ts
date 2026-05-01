@@ -1,12 +1,12 @@
 import type { PostmanClient } from './client.js';
 
 export interface GitInfo {
-  domain: string;
+  domain: string | null;
   repository: string;
   organization: string;
   schemaFolder: string;
   collectionFolder: string;
-  branch: string;
+  branch?: string;
 }
 
 export interface ApiBuilderApi {
@@ -21,10 +21,6 @@ interface ApisResponse {
   apis: ApiBuilderApi[];
 }
 
-interface ApiResponse {
-  api: ApiBuilderApi;
-}
-
 export async function listApisForWorkspace(
   client: PostmanClient,
   workspaceId: string
@@ -37,6 +33,14 @@ export async function getApiWithGitInfo(
   client: PostmanClient,
   apiId: string
 ): Promise<ApiBuilderApi> {
-  const response = await client.get<ApiResponse>(`/apis/${apiId}`, { include: 'gitInfo' });
-  return response.api;
+  const response = await client.get<ApiBuilderApi>(
+    `/apis/${apiId}?include=schemas,collections,versions,gitInfo`,
+    undefined,
+    { Accept: 'application/vnd.api.v10+json' }
+  );
+  if (process.env.MOAT_DEBUG) console.error('[debug] getApiWithGitInfo', JSON.stringify(response, null, 2));
+  if (Array.isArray(response.gitInfo)) {
+    response.gitInfo = undefined;
+  }
+  return response;
 }

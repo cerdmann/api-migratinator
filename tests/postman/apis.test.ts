@@ -41,17 +41,15 @@ describe('getApiWithGitInfo', () => {
   it('returns API with gitInfo when present', async () => {
     const client = makeClient([
       {
-        api: {
-          id: 'api-1',
-          name: 'Payments API',
-          gitInfo: {
-            domain: 'github.com',
-            repository: 'payments-api',
-            organization: 'acme-corp',
-            schemaFolder: '/',
-            collectionFolder: 'postman/collections',
-            branch: 'main',
-          },
+        id: 'api-1',
+        name: 'Payments API',
+        gitInfo: {
+          domain: 'github.com',
+          repository: 'payments-api',
+          organization: 'acme-corp',
+          schemaFolder: '/',
+          collectionFolder: 'postman/collections',
+          branch: 'main',
         },
       },
     ]);
@@ -62,15 +60,19 @@ describe('getApiWithGitInfo', () => {
 
   it('returns API without gitInfo when not git-linked', async () => {
     const client = makeClient([
-      { api: { id: 'api-2', name: 'Billing API' } },
+      { id: 'api-2', name: 'Billing API' },
     ]);
     const result = await getApiWithGitInfo(client, 'api-2');
     expect(result.gitInfo).toBeUndefined();
   });
 
   it('requests gitInfo include param', async () => {
-    const client = makeClient([{ api: { id: 'api-1', name: 'Test' } }]);
+    const client = makeClient([{ id: 'api-1', name: 'Test' }]);
     await getApiWithGitInfo(client, 'api-1');
-    expect(client.get).toHaveBeenCalledWith('/apis/api-1', { include: 'gitInfo' });
+    expect(client.get).toHaveBeenCalledWith(
+      '/apis/api-1?include=schemas,collections,versions,gitInfo',
+      undefined,
+      { Accept: 'application/vnd.api.v10+json' }
+    );
   });
 });

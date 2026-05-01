@@ -84,10 +84,12 @@ If installed globally, create `~/.moat.config.json` in your home directory:
 
 Env vars always take precedence over both config files — useful for CI/CD:
 
+```bash
+export POSTMAN_API_KEY=your-admin-api-key
+export GIT_TOKEN=your-github-or-gitlab-pat
 ```
-POSTMAN_API_KEY=your-admin-api-key
-GIT_TOKEN=your-github-or-gitlab-pat
-```
+
+> Note: `GIT_TOKEN` is only required for `moat migrate`. You can run `moat discover` with just `POSTMAN_API_KEY`.
 
 #### Workspace naming pattern
 
@@ -113,14 +115,19 @@ Precedence: **CLI flag → env var → moat.config.json → default (`{workspace
 
 ### 5. Verify your setup
 
-Once the tool is built, you can do a dry-run discovery to confirm it can see all your workspaces and APIs before triggering any migration:
+Run discovery to confirm the tool can see all your workspaces and APIs before triggering any migration:
 
 ```bash
-# coming soon
 moat discover
 ```
 
-This will page through all workspaces in your team, list every API Builder API found, indicate whether each is git-linked, check for workspace name collisions using your configured pattern, and print the resolved repo metadata — without making any changes.
+This pages through all workspaces in your team, lists every API Builder API found, indicates whether each is git-linked, checks for workspace name collisions using your configured pattern, and prints the resolved workspace names — without making any changes.
+
+If something looks wrong, prefix the command with `MOAT_DEBUG=1` to log every HTTP request and response:
+
+```bash
+MOAT_DEBUG=1 moat discover
+```
 
 ---
 

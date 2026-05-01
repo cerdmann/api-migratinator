@@ -46,7 +46,7 @@ describe('runDiscover', () => {
     const client = makeClient({
       '/workspaces': { workspaces: [wsAlpha] },
       '/apis?workspaceId=ws-1': { apis: [apiGit] },
-      '/apis/api-git?include=gitInfo': { api: { ...apiGit, gitInfo: gitInfoFull } },
+      '/apis/api-git?include=schemas,collections,versions,gitInfo': { ...apiGit, gitInfo: gitInfoFull },
     });
 
     const result = await runDiscover(client, '{workspace} - {spec}');
@@ -58,8 +58,8 @@ describe('runDiscover', () => {
     const client = makeClient({
       '/workspaces': { workspaces: [wsAlpha] },
       '/apis?workspaceId=ws-1': { apis: [apiGit, apiNoGit] },
-      '/apis/api-git?include=gitInfo': { api: { ...apiGit, gitInfo: gitInfoFull } },
-      '/apis/api-nogit?include=gitInfo': { api: { ...apiNoGit } },
+      '/apis/api-git?include=schemas,collections,versions,gitInfo': { ...apiGit, gitInfo: gitInfoFull },
+      '/apis/api-nogit?include=schemas,collections,versions,gitInfo': { ...apiNoGit },
     });
 
     const result = await runDiscover(client, '{workspace} - {spec}');
@@ -74,8 +74,8 @@ describe('runDiscover', () => {
       '/workspaces': { workspaces: [wsAlpha, wsBeta] },
       '/apis?workspaceId=ws-1': { apis: [apiGit] },
       '/apis?workspaceId=ws-2': { apis: [apiNoGit] },
-      '/apis/api-git?include=gitInfo': { api: { ...apiGit, gitInfo: gitInfoFull } },
-      '/apis/api-nogit?include=gitInfo': { api: { ...apiNoGit } },
+      '/apis/api-git?include=schemas,collections,versions,gitInfo': { ...apiGit, gitInfo: gitInfoFull },
+      '/apis/api-nogit?include=schemas,collections,versions,gitInfo': { ...apiNoGit },
     });
 
     const result = await runDiscover(client, '{workspace} - {spec}');
@@ -88,8 +88,8 @@ describe('runDiscover', () => {
       '/workspaces': { workspaces: [wsAlpha, wsBeta] },
       '/apis?workspaceId=ws-1': { apis: [apiGit] },
       '/apis?workspaceId=ws-2': { apis: [apiGit2] },
-      '/apis/api-git?include=gitInfo': { api: { ...apiGit, gitInfo: gitInfoFull } },
-      '/apis/api-git-2?include=gitInfo': { api: { ...apiGit2, gitInfo: { ...gitInfoFull, repository: 'payments-api-2' } } },
+      '/apis/api-git?include=schemas,collections,versions,gitInfo': { ...apiGit, gitInfo: gitInfoFull },
+      '/apis/api-git-2?include=schemas,collections,versions,gitInfo': { ...apiGit2, gitInfo: { ...gitInfoFull, repository: 'payments-api-2' } },
     });
 
     const result = await runDiscover(client, '{spec}');
@@ -100,7 +100,7 @@ describe('runDiscover', () => {
     const client = makeClient({
       '/workspaces': { workspaces: [wsAlpha] },
       '/apis?workspaceId=ws-1': { apis: [apiGit] },
-      '/apis/api-git?include=gitInfo': { api: { ...apiGit, gitInfo: gitInfoFull } },
+      '/apis/api-git?include=schemas,collections,versions,gitInfo': { ...apiGit, gitInfo: gitInfoFull },
     });
 
     const result = await runDiscover(client, '{workspace} - {spec}');
@@ -111,7 +111,7 @@ describe('runDiscover', () => {
     const client = makeClient({
       '/workspaces': { workspaces: [wsAlpha] },
       '/apis?workspaceId=ws-1': { apis: [apiGit] },
-      '/apis/api-git?include=gitInfo': { api: { ...apiGit, gitInfo: gitInfoFull } },
+      '/apis/api-git?include=schemas,collections,versions,gitInfo': { ...apiGit, gitInfo: gitInfoFull },
     });
 
     const result = await runDiscover(client, '{workspace} - {spec}');

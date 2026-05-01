@@ -59,13 +59,18 @@ export const migrateCommand = new Command('migrate')
 
     console.log(`Found ${discovery.apis.length} APIs (${discovery.gitLinked.length} git-linked, ${discovery.nonGitLinked.length} non-git-linked)\n`);
 
+    if (!config.gitToken) {
+      console.error('\nA git token is required for migration. Set GIT_TOKEN or add "gitToken" to moat.config.json.');
+      process.exit(1);
+    }
+
     if (options.dryRun) {
       console.log('Dry run — no changes will be made.\n');
       for (const api of discovery.apis) {
         const path = api.gitInfo ? 'Path A (git)' : 'Path B (no-git)';
         console.log(`  [${path}] ${api.workspaceName} / ${api.name}  →  "${api.resolvedWorkspaceName}"`);
       }
-      return;
+      process.exit(0);
     }
 
     const result = await runMigrate(client, discovery.apis, {
@@ -83,4 +88,6 @@ export const migrateCommand = new Command('migrate')
       result.failed.forEach(f => console.log(`  - ${f.id}: ${f.error}`));
       console.log(`\nRun \`moat status\` for details. Re-run \`moat migrate\` to retry failed APIs.`);
     }
+
+    process.exit(0);
   });

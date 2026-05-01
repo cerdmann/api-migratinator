@@ -29,11 +29,11 @@ describe('configSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects missing gitToken', () => {
+  it('accepts missing gitToken (optional — enforced by migrate command)', () => {
     const result = configSchema.safeParse({
       postmanApiKey: 'pk-123',
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   it('rejects empty string postmanApiKey', () => {

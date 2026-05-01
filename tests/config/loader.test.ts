@@ -61,9 +61,8 @@ describe('loadConfig', () => {
     ).rejects.toThrow();
   });
 
-  it('throws when gitToken is missing from all sources', async () => {
-    await expect(
-      loadConfig({ configFile: { postmanApiKey: 'pk' } })
-    ).rejects.toThrow();
+  it('succeeds when gitToken is missing (optional — enforced by migrate command)', async () => {
+    const config = await loadConfig({ configFile: { postmanApiKey: 'pk' } });
+    expect(config.gitToken).toBeUndefined();
   });
 });

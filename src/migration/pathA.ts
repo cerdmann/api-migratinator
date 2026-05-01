@@ -19,7 +19,7 @@ export async function migratePathA(
 ): Promise<PathAResult> {
   const { spawnCli, pollIntervalMs = 3000 } = options;
 
-  const gitPath = api.gitInfo?.schemaFolder ?? '/';
+  const gitPath = api.gitInfo?.schemaFolder || '/';
   validateGitPath(gitPath);
 
   const migrationResult = await startSpecMigration(client, api.id, {

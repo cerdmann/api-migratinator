@@ -2,68 +2,57 @@
 
 ## M.O.A.T. — Migrate Old APIs Today
 
-A scripted migration tool for moving large customer API Builder assets to V12 Spec Hub, using the git repo as the source of truth.
+A scripted migration tool for moving large customer API Builder assets to V12 Spec Hub. Supports both non-git-linked APIs (Path B) and git-linked APIs (Path A).
 
 ```
-moat migrate
 moat discover
+moat migrate
 moat status
 ```
 
 ---
 
-## Setting Up for Dev
+## Commands
 
-To test the migration tool end-to-end you need a Postman workspace populated with git-linked API Builder APIs. Follow the steps below to create a realistic test environment.
+### `moat discover`
 
-### Prerequisites
+Pages through all workspaces scoped to your API key, lists every API Builder API found, indicates whether each is git-linked, checks for workspace name collisions using your configured pattern, and prints resolved workspace names — without making any changes.
 
-- A Postman account with API Builder access (Enterprise plan or Professional Services sandbox)
-- Admin-level Postman API key — generate one at **Postman → Settings → API Keys**
-- One or more test git repos on GitHub, GitLab, or Bitbucket (one repo per API is the typical customer pattern, but a monorepo with subdirectories also works)
-- The repos must be accessible to your Postman account via a connected git integration
-
-### 1. Connect your git provider to Postman
-
-If you haven't already:
-
-1. In Postman, go to **Settings → Integrations**
-2. Add a GitHub (or GitLab / Bitbucket) integration and authorize Postman to access your repos
-3. Confirm the integration shows as active before proceeding
-
-### 2. Seed your test repos
-
-Each test repo needs at minimum:
-
-```
-/
-├── openapi.yaml          # or openapi.json — an OpenAPI 2/3 or AsyncAPI spec
-└── postman/
-    └── collections/
-        └── my-api.json   # a v2.1 collection (the migration will convert this to v3)
+```bash
+moat discover
+moat discover --output json   # machine-readable output
 ```
 
-You can use any valid OpenAPI spec. A minimal example is in [`docs/sample-spec.yaml`](docs/sample-spec.yaml). Create as many repos (or subdirectories) as you want to simulate `n` APIs.
+### `moat migrate`
 
-### 3. Create git-linked APIs in API Builder
+Migrates API Builder APIs to Spec Hub. Resumes automatically from a checkpoint if interrupted.
 
-Repeat the following for each test API you want to migrate:
+```bash
+moat migrate                          # migrate all APIs
+moat migrate --non-git                # migrate only non-git-linked APIs (Path B)
+moat migrate --api-id <id>            # migrate a single API by ID
+moat migrate --dry-run                # preview what would be migrated, no changes made
+moat migrate --concurrency <n>        # parallel migrations (default: 5)
+moat migrate --checkpoint <path>      # checkpoint file path (default: .moat-checkpoint.json)
+moat migrate --workspace-pattern <p>  # override workspace naming pattern
+```
 
-1. In Postman, open the target workspace and go to **APIs** in the left sidebar
-2. Click **+** to create a new API — give it a meaningful name (e.g. `test-api-01`)
-3. On the API overview page, click the **Repository** tab
-4. Click **Connect Repository** and select your git provider
-5. Choose the **organization**, **repository**, and **branch** (e.g. `main`)
-6. Set the **Schema directory** to the folder containing your spec file (e.g. `/` or `/specs`)
-7. Set the **Collection directory** to `postman/collections`
-8. Click **Connect** — Postman will pull the schema from the repo
-9. Publish at least one version: go to the **Overview** tab → **Publish** → name it `v1.0.0`
+After each run, `.moat-workspaces.json` is written with the IDs of all workspaces created. Use the cleanup script to delete them between test runs (see below).
 
-Repeat until you have enough APIs to exercise the tool at the scale you want to test.
+Re-running `moat migrate` after a partial run will automatically retry any failed APIs and skip already-completed ones.
 
-### 4. Configure the tool
+### `moat status`
 
-The tool auto-discovers all workspaces and APIs scoped to the provided API key — no workspace IDs required. A new dedicated workspace is created per API during migration, since V12 links one workspace to one git repo.
+Reads the checkpoint file and reports migration progress without making any changes.
+
+```bash
+moat status
+moat status --checkpoint <path>
+```
+
+---
+
+## Configuration
 
 `moat` looks for config in this order, using the first file it finds:
 
@@ -71,8 +60,6 @@ The tool auto-discovers all workspaces and APIs scoped to the provided API key �
 |---|---|
 | `./moat.config.json` | Project-level override (checked first) |
 | `~/.moat.config.json` | Global config — set once, works from any directory |
-
-If installed globally, create `~/.moat.config.json` in your home directory:
 
 ```json
 {
@@ -82,18 +69,18 @@ If installed globally, create `~/.moat.config.json` in your home directory:
 }
 ```
 
-Env vars always take precedence over both config files — useful for CI/CD:
+Env vars always take precedence over config files — useful for CI/CD:
 
 ```bash
 export POSTMAN_API_KEY=your-admin-api-key
 export GIT_TOKEN=your-github-or-gitlab-pat
 ```
 
-> Note: `GIT_TOKEN` is only required for `moat migrate`. You can run `moat discover` with just `POSTMAN_API_KEY`.
+> `GIT_TOKEN` is only required when migrating git-linked APIs (Path A). You can run `moat discover` and `moat migrate --non-git` with just `POSTMAN_API_KEY`.
 
-#### Workspace naming pattern
+### Workspace naming pattern
 
-Each migrated API gets its own new Postman workspace. The `workspacePattern` controls how it is named using tokens from the source API's metadata:
+Each migrated API gets its own new Postman workspace. The `workspacePattern` controls how it is named:
 
 | Token | Description | Example |
 |---|---|---|
@@ -103,37 +90,95 @@ Each migrated API gets its own new Postman workspace. The `workspacePattern` con
 | `{org}` | Git organisation or owner | `acme-corp` |
 | `{branch}` | Git branch | `main` |
 
-The pattern can also be passed as a CLI flag, which takes precedence over the config file:
-
-```bash
-moat migrate --workspace-pattern "{org}/{repo}"
-```
-
 Precedence: **CLI flag → env var → moat.config.json → default (`{workspace} - {spec}`)**
 
-`moat discover` will perform a collision check on generated workspace names before any migration runs and will warn if duplicates are detected.
+---
 
-### 5. Verify your setup
+## Migration paths
 
-Run discovery to confirm the tool can see all your workspaces and APIs before triggering any migration:
+### Path B — Non-git-linked APIs
+
+APIs without a connected git repository are migrated directly via the Postman `spec-migrations` endpoint. The API spec is moved server-side — no file fetching or manual workspace creation required.
+
+APIs with no schema are automatically skipped. APIs with an unsupported definition type (e.g. WSDL) are also skipped and will not be retried.
+
+### Path A — Git-linked APIs
+
+APIs connected to a GitHub, GitLab, or Bitbucket repository are migrated using the same `spec-migrations` endpoint with git metadata, followed by a `postman workspace push` to sync changes. Requires `GIT_TOKEN` and the Postman CLI to be installed.
+
+---
+
+## Debugging
+
+Prefix any command with `MOAT_DEBUG=1` to log every HTTP request URL, response keys, and error response bodies:
 
 ```bash
-moat discover
-```
-
-This pages through all workspaces in your team, lists every API Builder API found, indicates whether each is git-linked, checks for workspace name collisions using your configured pattern, and prints the resolved workspace names — without making any changes.
-
-If something looks wrong, prefix the command with `MOAT_DEBUG=1` to log every HTTP request and response:
-
-```bash
-MOAT_DEBUG=1 moat discover
+MOAT_DEBUG=1 moat migrate --api-id <id>
 ```
 
 ---
 
-## Architecture
+## Cleanup script
 
-See [`docs/design.md`](docs/design.md) for the full migration design.
+After test runs, delete all workspaces recorded in `.moat-workspaces.json`:
+
+```bash
+node scripts/cleanup-workspaces.js           # shows list, prompts before deleting
+node scripts/cleanup-workspaces.js --yes     # deletes immediately without prompt
+node scripts/cleanup-workspaces.js --file <path>  # use a different log file
+```
+
+The script reads the API key from `moat.config.json` automatically, falling back to the `POSTMAN_API_KEY` env var.
+
+---
+
+## Setting up a test environment
+
+### Non-git APIs (Path B)
+
+Any API Builder API that has a schema attached can be migrated via Path B. No git setup required. Run `moat discover` to see what's available in your team, then:
+
+```bash
+moat migrate --non-git --dry-run   # preview
+moat migrate --non-git             # run
+```
+
+### Git-linked APIs (Path A)
+
+To test Path A you need API Builder APIs connected to a git repository.
+
+#### Prerequisites
+
+- A Postman account with API Builder access (Enterprise plan or Professional Services sandbox)
+- Admin-level Postman API key
+- One or more test git repos on GitHub, GitLab, or Bitbucket
+- The repos must be accessible via a connected git integration in Postman
+- Postman CLI installed: `npm install -g postman-cli`
+
+#### Repo structure
+
+Each test repo needs at minimum:
+
+```
+/
+├── openapi.yaml          # OpenAPI 2/3 or AsyncAPI spec
+└── postman/
+    └── collections/
+        └── my-api.json   # a v2.1 collection
+```
+
+#### Creating git-linked APIs in API Builder
+
+1. In Postman, open the target workspace and go to **APIs** in the left sidebar
+2. Click **+** to create a new API
+3. On the API overview page, click the **Repository** tab
+4. Click **Connect Repository** and select your git provider
+5. Choose the **organization**, **repository**, and **branch**
+6. Set the **Schema directory** to the folder containing your spec file (e.g. `/`)
+7. Set the **Collection directory** to `postman/collections`
+8. Click **Connect**
+
+---
 
 ## Development
 

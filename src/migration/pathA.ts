@@ -22,12 +22,15 @@ export async function migratePathA(
   const gitPath = api.gitInfo?.schemaFolder || '/';
   validateGitPath(gitPath);
 
+  console.log(`Beginning migration of API ${api.id} to workspace "${api.resolvedWorkspaceName}"`);
+
   const migrationResult = await startSpecMigration(client, api.id, {
     workspaceInfo: { name: api.resolvedWorkspaceName },
     gitInfo: { path: gitPath },
   });
 
   if (migrationResult.empty) {
+    console.log(`Successfully migrated API ${api.id}`);
     return { status: 'completed', taskResult: { status: 'completed' } };
   }
 
@@ -37,5 +40,6 @@ export async function migratePathA(
 
   await spawnCli(['workspace', 'push', '--yes']);
 
+  console.log(`Successfully migrated API ${api.id}`);
   return { status: 'completed', taskResult };
 }

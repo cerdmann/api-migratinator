@@ -68,6 +68,15 @@ describe('Checkpoint', () => {
     await cleanup();
   });
 
+  it('marks an API as skipped', async () => {
+    const cp = new Checkpoint(join(dir, 'cp.json'));
+    await cp.init(['api-1', 'api-2']);
+    await cp.markSkipped('api-1', 'No schemas');
+    expect(await cp.getPending()).toEqual(['api-2']);
+    expect(await cp.getSkipped()).toEqual([{ id: 'api-1', reason: 'No schemas' }]);
+    await cleanup();
+  });
+
   it('returns empty pending when all APIs are done', async () => {
     const cp = new Checkpoint(join(dir, 'cp.json'));
     await cp.init(['api-1']);

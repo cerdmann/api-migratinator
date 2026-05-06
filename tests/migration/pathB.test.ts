@@ -9,20 +9,20 @@ const nonGitApi: DiscoveredApi = {
   workspaceId: 'ws-1',
   workspaceName: 'Alpha Team',
   resolvedWorkspaceName: 'Alpha Team - Billing API',
+  schemas: [{ id: 'schema-1', type: 'openapi:3_1' }],
 };
 
-const schemaFiles = [
-  { path: 'openapi.yaml', content: 'openapi: 3.1.0\ninfo:\n  title: Billing API' },
-];
-
-function makeClient(responses: Record<string, unknown>): PostmanClient {
+function makeClient(
+  postResponses: Record<string, unknown> = {},
+  getResponses: Record<string, unknown> = {}
+): PostmanClient {
   return {
     get: vi.fn(async (path: string) => {
-      if (path in responses) return responses[path];
+      if (path in getResponses) return getResponses[path];
       throw new Error(`Unexpected GET ${path}`);
     }),
     post: vi.fn(async (path: string) => {
-      if (path in responses) return responses[path];
+      if (path in postResponses) return postResponses[path];
       throw new Error(`Unexpected POST ${path}`);
     }),
     put: vi.fn(),
@@ -33,57 +33,67 @@ function makeClient(responses: Record<string, unknown>): PostmanClient {
 }
 
 describe('migratePathB', () => {
-  it('creates a new workspace', async () => {
-    const client = makeClient({
-      '/apis/api-nogit/schemas': { schemas: [{ id: 'schema-1', type: 'openapi:3_1' }] },
-      '/apis/api-nogit/schemas/schema-1/files': { files: schemaFiles },
-      '/workspaces': { id: 'new-ws-1', name: 'Alpha Team - Billing API' },
-      '/specs': { id: 'spec-1' },
-    });
+  it('posts to spec-migrations with workspaceInfo only (no gitInfo)', async () => {
+    const client = makeClient(
+      { '/apis/api-nogit/spec-migrations': { message: 'Moving to Spec Hub started successfully', success: true } },
+      { '/apis/api-nogit/spec-migrations': { status: 'completed' } }
+    );
 
-    await migratePathB(client, nonGitApi);
+    await migratePathB(client, nonGitApi, { pollIntervalMs: 0 });
 
-    expect(client.post).toHaveBeenCalledWith('/workspaces', expect.objectContaining({
-      workspace: expect.objectContaining({ name: 'Alpha Team - Billing API' }),
-    }));
+    expect(client.post).toHaveBeenCalledWith(
+      '/apis/api-nogit/spec-migrations',
+      { workspaceInfo: { name: 'Alpha Team - Billing API' } }
+    );
+    const body = (client.post as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(body).not.toHaveProperty('gitInfo');
   });
 
-  it('reads schema files from the source API', async () => {
-    const client = makeClient({
-      '/apis/api-nogit/schemas': { schemas: [{ id: 'schema-1', type: 'openapi:3_1' }] },
-      '/apis/api-nogit/schemas/schema-1/files': { files: schemaFiles },
-      '/workspaces': { id: 'new-ws-1' },
-      '/specs': { id: 'spec-1' },
-    });
+  it('polls until completed', async () => {
+    let pollCount = 0;
+    const client: PostmanClient = {
+      get: vi.fn(async () => {
+        pollCount++;
+        if (pollCount < 3) return { status: 'running' };
+        return { status: 'completed' };
+      }),
+      post: vi.fn(async () => ({ message: 'Moving to Spec Hub started successfully', success: true })),
+      put: vi.fn(),
+      delete: vi.fn(),
+      getDefaultHeaders: vi.fn(() => ({})),
+      getRateLimiterType: vi.fn(() => 'general' as const),
+    };
 
-    await migratePathB(client, nonGitApi);
+    await migratePathB(client, nonGitApi, { pollIntervalMs: 0 });
 
-    expect(client.get).toHaveBeenCalledWith('/apis/api-nogit/schemas');
-    expect(client.get).toHaveBeenCalledWith('/apis/api-nogit/schemas/schema-1/files');
+    expect(pollCount).toBe(3);
   });
 
-  it('creates a spec in the new workspace', async () => {
-    const client = makeClient({
-      '/apis/api-nogit/schemas': { schemas: [{ id: 'schema-1', type: 'openapi:3_1' }] },
-      '/apis/api-nogit/schemas/schema-1/files': { files: schemaFiles },
-      '/workspaces': { id: 'new-ws-1' },
-      '/specs': { id: 'spec-1' },
-    });
+  it('returns immediately when API has no definition', async () => {
+    const client = makeClient(
+      { '/apis/api-nogit/spec-migrations': { message: "doesn't have any API Definition", success: true } },
+    );
 
-    const result = await migratePathB(client, nonGitApi);
+    const result = await migratePathB(client, nonGitApi, { pollIntervalMs: 0 });
 
-    expect(client.post).toHaveBeenCalledWith('/specs', expect.objectContaining({
-      workspaceId: 'new-ws-1',
-      name: 'Billing API',
-    }));
-    expect(result.specId).toBe('spec-1');
+    expect(client.get).not.toHaveBeenCalled();
+    expect(result.status).toBe('completed');
+  });
+
+  it('throws when migration fails during polling', async () => {
+    const client = makeClient(
+      { '/apis/api-nogit/spec-migrations': { message: 'Moving to Spec Hub started successfully', success: true } },
+      { '/apis/api-nogit/spec-migrations': { status: 'failed', error: 'Something went wrong' } }
+    );
+
+    await expect(migratePathB(client, nonGitApi, { pollIntervalMs: 0 }))
+      .rejects.toThrow('Something went wrong');
   });
 
   it('throws when API has no schemas', async () => {
-    const client = makeClient({
-      '/apis/api-nogit/schemas': { schemas: [] },
-    });
+    const apiWithNoSchemas: DiscoveredApi = { ...nonGitApi, schemas: [] };
+    const client = makeClient();
 
-    await expect(migratePathB(client, nonGitApi)).rejects.toThrow('no schemas');
+    await expect(migratePathB(client, apiWithNoSchemas)).rejects.toThrow('no schemas');
   });
 });

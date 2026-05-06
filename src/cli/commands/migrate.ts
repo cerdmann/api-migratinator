@@ -22,6 +22,7 @@ export const migrateCommand = new Command('migrate')
   .option('--api-id <id>', 'Migrate a single API by ID')
   .option('--concurrency <n>', 'Number of APIs to migrate in parallel', '5')
   .option('--checkpoint <path>', 'Path to checkpoint file for resume support', '.moat-checkpoint.json')
+  .option('--non-git', 'Migrate only non-git-linked APIs (Path B)')
   .option('--dry-run', 'Preview what would be migrated without making changes')
   .action(async (options) => {
     const configFile = await resolveConfigFile();
@@ -59,17 +60,6 @@ export const migrateCommand = new Command('migrate')
       process.exit(1);
     }
 
-    console.log(`Found ${discovery.apis.length} APIs (${discovery.gitLinked.length} git-linked, ${discovery.nonGitLinked.length} non-git-linked)\n`);
-
-    if (options.dryRun) {
-      console.log('Dry run — no changes will be made.\n');
-      for (const api of discovery.apis) {
-        const path = api.gitInfo ? 'Path A (git)' : 'Path B (no-git)';
-        console.log(`  [${path}] ${api.workspaceName} / ${api.name}  →  "${api.resolvedWorkspaceName}"`);
-      }
-      process.exit(0);
-    }
-
     let apisToMigrate = discovery.apis;
     if (options.apiId) {
       apisToMigrate = discovery.apis.filter(a => a.id === options.apiId);
@@ -77,6 +67,21 @@ export const migrateCommand = new Command('migrate')
         console.error(`\nNo API found with ID "${options.apiId}". Run \`moat discover\` to list available APIs.`);
         process.exit(1);
       }
+      console.log(`Found API: ${apisToMigrate[0].name} (${options.apiId})\n`);
+    } else if (options.nonGit) {
+      apisToMigrate = discovery.nonGitLinked;
+      console.log(`Found ${apisToMigrate.length} non-git-linked APIs\n`);
+    } else {
+      console.log(`Found ${discovery.apis.length} APIs (${discovery.gitLinked.length} git-linked, ${discovery.nonGitLinked.length} non-git-linked)\n`);
+    }
+
+    if (options.dryRun) {
+      console.log('Dry run — no changes will be made.\n');
+      for (const api of apisToMigrate) {
+        const path = api.gitInfo ? 'Path A (git)' : 'Path B (no-git)';
+        console.log(`  [${path}] ${api.workspaceName} / ${api.name}  →  "${api.resolvedWorkspaceName}"`);
+      }
+      process.exit(0);
     }
 
     const hasGitLinked = apisToMigrate.some(a => a.gitInfo);
@@ -103,7 +108,13 @@ export const migrateCommand = new Command('migrate')
 
     console.log(`\nMigration complete.`);
     console.log(`  Completed: ${result.completed.length}`);
+    console.log(`  Skipped:   ${result.skipped.length}`);
     console.log(`  Failed:    ${result.failed.length}`);
+
+    if (result.skipped.length > 0) {
+      console.log('\nSkipped APIs (no spec to migrate):');
+      result.skipped.forEach(s => console.log(`  - ${s.id}: ${s.reason}`));
+    }
 
     if (result.failed.length > 0) {
       console.log('\nFailed APIs:');

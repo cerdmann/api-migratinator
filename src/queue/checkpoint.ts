@@ -6,10 +6,16 @@ interface FailedEntry {
   error: string;
 }
 
+interface SkippedEntry {
+  id: string;
+  reason: string;
+}
+
 interface CheckpointData {
   pending: string[];
   completed: string[];
   failed: FailedEntry[];
+  skipped: SkippedEntry[];
 }
 
 export interface Progress {
@@ -21,14 +27,14 @@ export interface Progress {
 
 export class Checkpoint {
   private path: string;
-  private data: CheckpointData = { pending: [], completed: [], failed: [] };
+  private data: CheckpointData = { pending: [], completed: [], failed: [], skipped: [] };
 
   constructor(path: string) {
     this.path = path;
   }
 
   async init(apiIds: string[]): Promise<void> {
-    this.data = { pending: [...apiIds], completed: [], failed: [] };
+    this.data = { pending: [...apiIds], completed: [], failed: [], skipped: [] };
     await this.persist();
   }
 
@@ -50,6 +56,13 @@ export class Checkpoint {
     await this.persist();
   }
 
+  async requeueFailed(): Promise<void> {
+    const failedIds = this.data.failed.map(f => f.id);
+    this.data.failed = [];
+    this.data.pending.push(...failedIds);
+    await this.persist();
+  }
+
   async getPending(): Promise<string[]> {
     return [...this.data.pending];
   }
@@ -60,6 +73,16 @@ export class Checkpoint {
 
   async getFailed(): Promise<FailedEntry[]> {
     return [...this.data.failed];
+  }
+
+  async markSkipped(id: string, reason: string): Promise<void> {
+    this.data.pending = this.data.pending.filter(p => p !== id);
+    this.data.skipped.push({ id, reason });
+    await this.persist();
+  }
+
+  async getSkipped(): Promise<SkippedEntry[]> {
+    return [...(this.data.skipped ?? [])];
   }
 
   async getProgress(): Promise<Progress> {

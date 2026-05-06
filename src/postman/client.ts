@@ -30,10 +30,21 @@ export function createPostmanClient({ apiKey }: { apiKey: string }): PostmanClie
       console.error('[debug url]', config.method?.toUpperCase(), (config.baseURL ?? '') + (config.url ?? ''));
       return config;
     });
-    instance.interceptors.response.use(response => {
-      console.error('[debug response keys]', response.config.url, Object.keys(response.data ?? {}));
-      return response;
-    });
+    instance.interceptors.response.use(
+      response => {
+        console.error('[debug response keys]', response.config.url, Object.keys(response.data ?? {}));
+        return response;
+      },
+      err => {
+        const url = err.config?.url ?? '?';
+        const status = err.response?.status ?? 'network error';
+        console.error('[debug error]', err.config?.method?.toUpperCase(), url, status);
+        if (err.response?.data) {
+          console.error('[debug error body]', JSON.stringify(err.response.data));
+        }
+        return Promise.reject(err);
+      }
+    );
   }
 
   axiosRetry(instance, {

@@ -4,6 +4,7 @@ import {
   pollMigrationTask,
   validateGitPath,
 } from '../../src/postman/migrations.js';
+import { SkipError } from '../../src/migration/errors.js';
 import type { PostmanClient } from '../../src/postman/client.js';
 
 function makeClient(postResponses: Record<string, unknown>, getResponses: Record<string, unknown> = {}): PostmanClient {
@@ -38,8 +39,7 @@ describe('startSpecMigration', () => {
     expect(result.empty).toBe(false);
     expect(client.post).toHaveBeenCalledWith(
       '/apis/api-1/spec-migrations',
-      { workspaceInfo: { name: 'My Workspace' }, gitInfo: { path: '/payments' } },
-      { Accept: 'application/vnd.api.v10+json' }
+      { workspaceInfo: { name: 'My Workspace' }, gitInfo: { path: '/payments' } }
     );
   });
 
@@ -54,8 +54,7 @@ describe('startSpecMigration', () => {
 
     expect(client.post).toHaveBeenCalledWith(
       '/apis/api-1/spec-migrations',
-      { workspaceId: 'existing-ws-uuid' },
-      { Accept: 'application/vnd.api.v10+json' }
+      { workspaceId: 'existing-ws-uuid' }
     );
   });
 
@@ -88,7 +87,7 @@ describe('startSpecMigration', () => {
     };
 
     await expect(startSpecMigration(client, 'api-1', { workspaceInfo: { name: 'ws' } }))
-      .rejects.toThrow('unsupported definition type');
+      .rejects.toThrow(SkipError);
   });
 
   it('throws on repo already linked to another workspace', async () => {
@@ -125,11 +124,7 @@ describe('pollMigrationTask', () => {
 
     const result = await pollMigrationTask(client, 'api-1', { intervalMs: 0 });
     expect(result.status).toBe('completed');
-    expect(client.get).toHaveBeenCalledWith(
-      '/apis/api-1/spec-migrations',
-      undefined,
-      { Accept: 'application/vnd.api.v10+json' }
-    );
+    expect(client.get).toHaveBeenCalledWith('/apis/api-1/spec-migrations');
   });
 
   it('treats "success" status as completed', async () => {

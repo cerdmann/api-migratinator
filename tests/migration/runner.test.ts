@@ -38,6 +38,7 @@ const nonGitApi: DiscoveredApi = {
   workspaceId: 'ws-1',
   workspaceName: 'Alpha Team',
   resolvedWorkspaceName: 'Alpha Team - Billing API',
+  schemas: [{ id: 'schema-1', type: 'openapi:3_1' }],
 };
 
 function makeClient(
@@ -83,11 +84,8 @@ describe('runMigrate', () => {
   it('routes non-git APIs through Path B', async () => {
     const spawnCli = vi.fn().mockResolvedValue(undefined);
     const client = makeClient(
-      { '/workspaces': { id: 'new-ws-1' }, '/specs': { id: 'spec-1' } },
-      {
-        '/apis/api-nogit/schemas': { schemas: [{ id: 'schema-1', type: 'openapi:3_1' }] },
-        '/apis/api-nogit/schemas/schema-1/files': { files: [{ path: 'openapi.yaml', content: '' }] },
-      }
+      { '/apis/api-nogit/spec-migrations': { message: 'Moving to Spec Hub started successfully', success: true } },
+      { '/apis/api-nogit/spec-migrations': { status: 'completed' } }
     );
 
     const result = await runMigrate(client, [nonGitApi], {
@@ -99,6 +97,25 @@ describe('runMigrate', () => {
 
     expect(result.completed).toContain('api-nogit');
     expect(result.failed).toHaveLength(0);
+    expect(result.skipped).toHaveLength(0);
+    await cleanup();
+  });
+
+  it('marks APIs with no schemas as skipped, not failed', async () => {
+    const spawnCli = vi.fn().mockResolvedValue(undefined);
+    const noSchemaApi: DiscoveredApi = { ...nonGitApi, schemas: [] };
+    const client = makeClient({}, {});
+
+    const result = await runMigrate(client, [noSchemaApi], {
+      spawnCli,
+      checkpointPath: join(dir, 'cp.json'),
+      concurrency: 1,
+      pollIntervalMs: 0,
+    });
+
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0].id).toBe('api-nogit');
+    expect(result.failed).toHaveLength(0);
     await cleanup();
   });
 
@@ -107,13 +124,11 @@ describe('runMigrate', () => {
     const client = makeClient(
       {
         '/apis/api-git/spec-migrations': { message: 'Moving to Spec Hub started successfully', success: true },
-        '/workspaces': { id: 'new-ws-1' },
-        '/specs': { id: 'spec-1' },
+        '/apis/api-nogit/spec-migrations': { message: 'Moving to Spec Hub started successfully', success: true },
       },
       {
         '/apis/api-git/spec-migrations': { status: 'failed', error: 'Repo not found' },
-        '/apis/api-nogit/schemas': { schemas: [{ id: 'schema-1', type: 'openapi:3_1' }] },
-        '/apis/api-nogit/schemas/schema-1/files': { files: [{ path: 'openapi.yaml', content: '' }] },
+        '/apis/api-nogit/spec-migrations': { status: 'completed' },
       }
     );
 
@@ -133,11 +148,8 @@ describe('runMigrate', () => {
   it('skips APIs already marked completed in checkpoint', async () => {
     const spawnCli = vi.fn().mockResolvedValue(undefined);
     const client = makeClient(
-      { '/workspaces': { id: 'new-ws-1' }, '/specs': { id: 'spec-1' } },
-      {
-        '/apis/api-nogit/schemas': { schemas: [{ id: 'schema-1', type: 'openapi:3_1' }] },
-        '/apis/api-nogit/schemas/schema-1/files': { files: [{ path: 'openapi.yaml', content: '' }] },
-      }
+      { '/apis/api-nogit/spec-migrations': { message: 'Moving to Spec Hub started successfully', success: true } },
+      { '/apis/api-nogit/spec-migrations': { status: 'completed' } }
     );
 
     const cpPath = join(dir, 'cp.json');

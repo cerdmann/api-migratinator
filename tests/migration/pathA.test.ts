@@ -55,7 +55,6 @@ describe('migratePathA', () => {
       expect.objectContaining({
         workspaceInfo: { name: 'Alpha Team - Payments API' },
       }),
-      expect.any(Object)
     );
   });
 
@@ -87,7 +86,6 @@ describe('migratePathA', () => {
       expect.objectContaining({
         gitInfo: { path: '/' },
       }),
-      expect.any(Object)
     );
   });
 

@@ -1,6 +1,5 @@
 import type { PostmanClient } from './client.js';
-
-const MIGRATION_ACCEPT = { Accept: 'application/vnd.api.v10+json' };
+import { SkipError } from '../migration/errors.js';
 
 export type SpecMigrationBody =
   | { workspaceId: string }
@@ -14,6 +13,7 @@ export interface SpecMigrationResult {
 
 export interface TaskResult {
   status: 'completed' | 'pending' | 'failed';
+  workspaceId?: string;
   error?: string;
 }
 
@@ -42,14 +42,13 @@ export async function startSpecMigration(
   try {
     response = await client.post(
       `/apis/${apiId}/spec-migrations`,
-      body,
-      MIGRATION_ACCEPT
+      body
     );
   } catch (err: unknown) {
     const axiosErr = err as { response?: { status?: number; data?: { error?: { title?: string; message?: string } } } };
     const errMsg = axiosErr.response?.data?.error?.message ?? axiosErr.response?.data?.error?.title ?? (err instanceof Error ? err.message : String(err));
     if (errMsg.toLowerCase().includes('unsupported definition type') || errMsg.toLowerCase().includes('unsupported')) {
-      throw new Error(`Migration failed: unsupported definition type — ${errMsg}`);
+      throw new SkipError(`Unsupported definition type — ${errMsg}`);
     }
     if (errMsg.toLowerCase().includes('already linked to another workspace')) {
       throw new Error(`Migration failed: git repository is already linked to another workspace`);
@@ -71,20 +70,20 @@ export async function pollMigrationTask(
   const { intervalMs = 3000 } = options;
 
   while (true) {
-    const result = await client.get<{ status: string; error?: string }>(
-      `/apis/${apiId}/spec-migrations`,
-      undefined,
-      MIGRATION_ACCEPT
+    console.log(`Checking status of API ${apiId}`);
+    const result = await client.get<{ status: string; error?: string; details?: { workspaceId?: string } }>(
+      `/apis/${apiId}/spec-migrations`
     );
 
-    const { status, error } = result;
+    const status = result.status.toLowerCase();
+    const error = result.error;
 
     if (status === 'failed' || status === 'error') {
       throw new Error(error ?? `Migration ${status}`);
     }
 
     if (status === 'completed' || status === 'success') {
-      return { status: 'completed' };
+      return { status: 'completed', workspaceId: result.details?.workspaceId };
     }
 
     if (intervalMs > 0) {

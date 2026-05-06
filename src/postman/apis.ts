@@ -9,12 +9,18 @@ export interface GitInfo {
   branch?: string;
 }
 
+export interface ApiSchema {
+  id: string;
+  type: string;
+}
+
 export interface ApiBuilderApi {
   id: string;
   name: string;
   uid?: string;
   workspaceId?: string;
   gitInfo?: GitInfo;
+  schemas?: ApiSchema[];
 }
 
 interface ApisResponse {

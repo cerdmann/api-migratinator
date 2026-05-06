@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { loadConfig } from '../../config/loader.js';
 import { resolveConfigFile } from '../../config/file.js';
 import { createPostmanClient } from '../../postman/client.js';
-import { runDiscover } from '../../migration/discover.js';
+import { runDiscover } from '../../migration/discovery.js';
 
 export const discoverCommand = new Command('discover')
   .description('Discover all API Builder APIs across all team workspaces and check for naming collisions')
@@ -20,43 +20,38 @@ export const discoverCommand = new Command('discover')
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(`\n${message}`);
-      console.error('\nCreate a moat.config.json (see moat.config.json.example) or set POSTMAN_API_KEY and GIT_TOKEN env vars.');
+      console.error(JSON.stringify({ error: message }));
       process.exit(1);
     }
 
     const client = createPostmanClient({ apiKey: config.postmanApiKey });
-
-    console.log('Discovering workspaces and APIs...\n');
 
     let result;
     try {
       result = await runDiscover(client, config.workspacePattern);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(`\nFailed to discover APIs: ${message}`);
-      console.error('Check that your POSTMAN_API_KEY is valid and has admin access.');
+      console.error(JSON.stringify({ error: `Failed to discover APIs: ${message}` }));
       process.exit(1);
     }
 
-    console.log(`Workspaces found:   ${result.workspaces.length}`);
-    console.log(`Total APIs found:   ${result.apis.length}`);
-    console.log(`  Git-linked:       ${result.gitLinked.length}`);
-    console.log(`  Non-git-linked:   ${result.nonGitLinked.length}`);
+    const output = {
+      summary: {
+        workspacesFound: result.workspaces.length,
+        totalApis: result.apis.length,
+        gitLinked: result.gitLinked.length,
+        nonGitLinked: result.nonGitLinked.length,
+        collisions: result.collisions,
+      },
+      apis: result.apis.map(api => ({
+        id: api.id,
+        name: api.name,
+        workspaceName: api.workspaceName,
+        resolvedWorkspaceName: api.resolvedWorkspaceName,
+        gitLinked: !!api.gitInfo,
+      })),
+    };
 
-    if (result.collisions.length > 0) {
-      console.log(`\n⚠ Workspace name collisions detected (${result.collisions.length}):`);
-      result.collisions.forEach(name => console.log(`  - "${name}"`));
-      console.log('\n  Adjust --workspace-pattern to resolve before migrating.');
-    } else {
-      console.log('\n✓ No workspace name collisions detected.');
-    }
-
-    console.log('\nAPI breakdown:\n');
-    for (const api of result.apis) {
-      const tag = api.gitInfo ? '[git]    ' : '[no-git] ';
-      console.log(`  ${tag} ${api.workspaceName} / ${api.name}  →  "${api.resolvedWorkspaceName}"`);
-    }
-
+    console.log(JSON.stringify(output, null, 2));
     process.exit(0);
   });

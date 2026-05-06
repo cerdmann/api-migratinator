@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { runDiscover } from '../../src/migration/discover.js';
+import { runDiscover } from '../../src/migration/discovery.js';
 import type { PostmanClient } from '../../src/postman/client.js';
 
 const wsAlpha = { id: 'ws-1', name: 'Alpha Team', type: 'team' };

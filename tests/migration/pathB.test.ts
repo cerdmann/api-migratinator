@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { migratePathB } from '../../src/migration/pathB.js';
 import type { PostmanClient } from '../../src/postman/client.js';
-import type { DiscoveredApi } from '../../src/migration/discover.js';
+import type { DiscoveredApi } from '../../src/migration/discovery.js';
 
 const nonGitApi: DiscoveredApi = {
   id: 'api-nogit',

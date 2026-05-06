@@ -1,6 +1,6 @@
 import type { PostmanClient } from '../postman/client.js';
 import { startSpecMigration, pollMigrationTask, validateGitPath, type TaskResult } from '../postman/migrations.js';
-import type { DiscoveredApi } from './discover.js';
+import type { DiscoveredApi } from './discovery.js';
 
 export interface PathAOptions {
   spawnCli: (args: string[]) => Promise<void>;

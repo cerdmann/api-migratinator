@@ -1,6 +1,6 @@
 import type { PostmanClient } from '../postman/client.js';
 import { getSchemas, getSchemaFiles } from '../postman/schemas.js';
-import type { DiscoveredApi } from './discover.js';
+import type { DiscoveredApi } from './discovery.js';
 
 export interface PathBResult {
   specId: string;

@@ -3,8 +3,9 @@ import { spawn } from 'child_process';
 import { loadConfig } from '../../config/loader.js';
 import { resolveConfigFile } from '../../config/file.js';
 import { createPostmanClient } from '../../postman/client.js';
-import { runDiscover } from '../../migration/discover.js';
-import { runMigrate } from '../../migration/migrate.js';
+import { runDiscover } from '../../migration/discovery.js';
+import { runMigrate } from '../../migration/runner.js';
+import { checkPostmanCli } from '../postman-cli.js';
 
 function spawnCli(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -18,6 +19,7 @@ function spawnCli(args: string[]): Promise<void> {
 export const migrateCommand = new Command('migrate')
   .description('Migrate all API Builder APIs to V12 Spec Hub')
   .option('--workspace-pattern <pattern>', 'Workspace naming pattern (overrides moat.config.json)')
+  .option('--api-id <id>', 'Migrate a single API by ID')
   .option('--concurrency <n>', 'Number of APIs to migrate in parallel', '5')
   .option('--checkpoint <path>', 'Path to checkpoint file for resume support', '.moat-checkpoint.json')
   .option('--dry-run', 'Preview what would be migrated without making changes')
@@ -59,11 +61,6 @@ export const migrateCommand = new Command('migrate')
 
     console.log(`Found ${discovery.apis.length} APIs (${discovery.gitLinked.length} git-linked, ${discovery.nonGitLinked.length} non-git-linked)\n`);
 
-    if (!config.gitToken) {
-      console.error('\nA git token is required for migration. Set GIT_TOKEN or add "gitToken" to moat.config.json.');
-      process.exit(1);
-    }
-
     if (options.dryRun) {
       console.log('Dry run — no changes will be made.\n');
       for (const api of discovery.apis) {
@@ -73,7 +70,32 @@ export const migrateCommand = new Command('migrate')
       process.exit(0);
     }
 
-    const result = await runMigrate(client, discovery.apis, {
+    let apisToMigrate = discovery.apis;
+    if (options.apiId) {
+      apisToMigrate = discovery.apis.filter(a => a.id === options.apiId);
+      if (apisToMigrate.length === 0) {
+        console.error(`\nNo API found with ID "${options.apiId}". Run \`moat discover\` to list available APIs.`);
+        process.exit(1);
+      }
+    }
+
+    const hasGitLinked = apisToMigrate.some(a => a.gitInfo);
+
+    if (hasGitLinked) {
+      if (!config.gitToken) {
+        console.error('\nA git token is required for git-linked APIs. Set GIT_TOKEN or add "gitToken" to moat.config.json.');
+        process.exit(1);
+      }
+      try {
+        await checkPostmanCli();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`\n${message}`);
+        process.exit(1);
+      }
+    }
+
+    const result = await runMigrate(client, apisToMigrate, {
       spawnCli,
       checkpointPath: options.checkpoint,
       concurrency: parseInt(options.concurrency, 10),

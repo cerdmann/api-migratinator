@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { runMigrate } from '../../src/migration/migrate.js';
+import { runMigrate } from '../../src/migration/runner.js';
 import type { PostmanClient } from '../../src/postman/client.js';
-import type { DiscoveredApi } from '../../src/migration/discover.js';
+import type { DiscoveredApi } from '../../src/migration/discovery.js';
 
 let dir: string;
 

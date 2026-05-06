@@ -3,7 +3,7 @@ import { Checkpoint } from '../queue/checkpoint.js';
 import { migratePathA, type PathAOptions } from './pathA.js';
 import { migratePathB } from './pathB.js';
 import type { PostmanClient } from '../postman/client.js';
-import type { DiscoveredApi } from './discover.js';
+import type { DiscoveredApi } from './discovery.js';
 import { existsSync } from 'fs';
 
 export interface MigrateOptions {

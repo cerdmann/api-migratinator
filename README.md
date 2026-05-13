@@ -76,6 +76,8 @@ export POSTMAN_API_KEY=your-admin-api-key
 export GIT_TOKEN=your-github-or-gitlab-pat
 ```
 
+To generate a `GIT_TOKEN` in GitHub: **Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token**. Select the **`repo`** scope. Copy the token immediately and export it as above or add it to `moat.config.json`.
+
 > `GIT_TOKEN` is only required when migrating git-linked APIs (Path A). You can run `moat discover` and `moat migrate --non-git` with just `POSTMAN_API_KEY`.
 
 ### Workspace naming pattern

@@ -6,3 +6,4 @@ coverage/
 moat.config.json
 
 *.log
+.moat-checkpoint.json
